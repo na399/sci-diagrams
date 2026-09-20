@@ -31,18 +31,31 @@ function finite(value: number, name: string, positive = false): number {
 }
 
 /** Explicit helper, not an implicit rewrite of MDP x/y or containment semantics. */
-export function arrange<T extends PositionedEntity>(entities: readonly T[], options: Arrangement): T[] {
+export function arrange<T extends PositionedEntity>(
+  entities: readonly T[],
+  options: Arrangement,
+): (T & { x: number; y: number })[] {
   finite(options.x, 'x');
   finite(options.y, 'y');
-  if (options.x < 0 || options.y < 0) throw new RangeError('MDP coordinates must be non-negative.');
+  if (options.x < 0 || options.y < 0) {
+    throw new RangeError('MDP coordinates must be non-negative.');
+  }
   const gap = options.gap ?? 24;
   finite(gap, 'gap');
-  if (gap < 0) throw new RangeError('gap cannot be negative.');
-  if (!['row', 'column', 'grid'].includes(options.type)) throw new RangeError('Unknown arrangement.');
-  if (options.align !== undefined && !['start', 'center', 'end'].includes(options.align)) throw new RangeError('Unknown alignment.');
+  if (gap < 0) {
+    throw new RangeError('gap cannot be negative.');
+  }
+  if (!['row', 'column', 'grid'].includes(options.type)) {
+    throw new RangeError('Unknown arrangement.');
+  }
+  if (options.align !== undefined && !['start', 'center', 'end'].includes(options.align)) {
+    throw new RangeError('Unknown alignment.');
+  }
   const ids = new Set<string>();
   for (const entity of entities) {
-    if (!entity.id || ids.has(entity.id)) throw new RangeError('Entity IDs must be nonempty and unique.');
+    if (!entity.id || ids.has(entity.id)) {
+      throw new RangeError('Entity IDs must be nonempty and unique.');
+    }
     ids.add(entity.id);
     finite(entity.width, `${entity.id}.width`, true);
     finite(entity.height, `${entity.id}.height`, true);
@@ -50,9 +63,13 @@ export function arrange<T extends PositionedEntity>(entities: readonly T[], opti
       throw new RangeError(`arrange refuses to overwrite authored coordinates on ${entity.id}.`);
     }
   }
-  if (!entities.length) return [];
+  if (!entities.length) {
+    return [];
+  }
   const columns = options.type === 'row' ? entities.length : options.type === 'column' ? 1 : options.columns ?? 2;
-  if (!Number.isInteger(columns) || columns < 1 || columns > 1000) throw new RangeError('columns must be an integer in [1, 1000].');
+  if (!Number.isInteger(columns) || columns < 1 || columns > 1000) {
+    throw new RangeError('columns must be an integer in [1, 1000].');
+  }
   const widths = Array.from({ length: columns }, () => 0);
   const heights = Array.from({ length: Math.ceil(entities.length / columns) }, () => 0);
   entities.forEach((entity, i) => {
@@ -71,9 +88,15 @@ export function arrange<T extends PositionedEntity>(entities: readonly T[], opti
 
 /** Quantitative positions are never silently clamped or replaced by ordinal spacing. */
 export function linearPosition(value: number, start: number, end: number, left: number, right: number): number {
-  for (const [name, n] of Object.entries({ value, start, end, left, right })) finite(n, name);
-  if (end <= start || right <= left) throw new RangeError('Scale domains and ranges must increase.');
-  if (value < start || value > end) throw new RangeError(`Time ${value} lies outside [${start}, ${end}].`);
+  for (const [name, n] of Object.entries({ value, start, end, left, right })) {
+    finite(n, name);
+  }
+  if (end <= start || right <= left) {
+    throw new RangeError('Scale domains and ranges must increase.');
+  }
+  if (value < start || value > end) {
+    throw new RangeError(`Time ${value} lies outside [${start}, ${end}].`);
+  }
   return left + (value - start) / (end - start) * (right - left);
 }
 
@@ -121,29 +144,49 @@ export function timelineGeometry(input: TimelineInput): TimelineGeometry {
   const right = input.width - 40;
   finite(laneHeight, 'laneHeight', true);
   finite(left, 'labelWidth');
-  if (left < 0 || right - left < 100) throw new RangeError('Timeline requires at least 100 px of plot width.');
-  if (!input.lanes.length || input.lanes.length > 32) throw new RangeError('Use 1 to 32 timeline lanes.');
-  if (input.items.length > 512) throw new RangeError('Use at most 512 timeline items.');
+  if (left < 0 || right - left < 100) {
+    throw new RangeError('Timeline requires at least 100 px of plot width.');
+  }
+  if (!input.lanes.length || input.lanes.length > 32) {
+    throw new RangeError('Use 1 to 32 timeline lanes.');
+  }
+  if (input.items.length > 512) {
+    throw new RangeError('Use at most 512 timeline items.');
+  }
   const scale = (time: number): number => linearPosition(time, input.start, input.end, left, right);
   scale(input.start);
   const laneIds = new Map<string, number>();
   input.lanes.forEach((lane, i) => {
-    if (!lane.id || laneIds.has(lane.id)) throw new RangeError('Timeline lane IDs must be unique and nonempty.');
+    if (!lane.id || laneIds.has(lane.id)) {
+      throw new RangeError('Timeline lane IDs must be unique and nonempty.');
+    }
     laneIds.set(lane.id, i);
   });
   const axisY = 42;
   const ids = new Set<string>();
   const marks = input.items.map((item, i) => {
-    if (!item.id || ids.has(item.id)) throw new RangeError('Timeline item IDs must be unique and nonempty.');
+    if (!item.id || ids.has(item.id)) {
+      throw new RangeError('Timeline item IDs must be unique and nonempty.');
+    }
     ids.add(item.id);
     const lane = laneIds.get(item.lane);
-    if (lane === undefined) throw new RangeError(`Unknown timeline lane: ${item.lane}`);
-    if (!['event', 'interval'].includes(item.kind)) throw new RangeError(`Unknown timeline item kind: ${item.kind}`);
+    if (lane === undefined) {
+      throw new RangeError(`Unknown timeline lane: ${item.lane}`);
+    }
+    if (!['event', 'interval'].includes(item.kind)) {
+      throw new RangeError(`Unknown timeline item kind: ${item.kind}`);
+    }
     const event = item.kind === 'event';
-    if (!event && (item.end === undefined || item.end <= item.start)) throw new RangeError(`Interval ${item.id} requires end > start.`);
-    if (event && item.end !== undefined) throw new RangeError(`Event ${item.id} must not specify end.`);
+    if (!event && (item.end === undefined || item.end <= item.start)) {
+      throw new RangeError(`Interval ${item.id} requires end > start.`);
+    }
+    if (event && item.end !== undefined) {
+      throw new RangeError(`Event ${item.id} must not specify end.`);
+    }
     const closed = item.closed ?? 'left';
-    if (!['left', 'right', 'both', 'neither'].includes(closed)) throw new RangeError('Invalid endpoint closure.');
+    if (!['left', 'right', 'both', 'neither'].includes(closed)) {
+      throw new RangeError('Invalid endpoint closure.');
+    }
     const x = scale(item.start);
     const endX = event ? x : scale(item.end!);
     const y = 94 + lane * laneHeight;
@@ -158,7 +201,9 @@ export function timelineGeometry(input: TimelineInput): TimelineGeometry {
     };
   });
   const ticks = input.ticks ?? Array.from({ length: 5 }, (_, i) => input.start + (input.end - input.start) * i / 4);
-  if (ticks.length > 64 || new Set(ticks).size !== ticks.length) throw new RangeError('Use at most 64 unique ticks.');
+  if (ticks.length > 64 || new Set(ticks).size !== ticks.length) {
+    throw new RangeError('Use at most 64 unique ticks.');
+  }
   return {
     height: 120 + (input.lanes.length - 1) * laneHeight,
     left, right, axisY,
