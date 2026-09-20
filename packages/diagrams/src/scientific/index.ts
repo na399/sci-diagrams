@@ -38,7 +38,8 @@ const common: Record<string, JsonSchema> = {
     properties: { kind: { type: 'string', enum: ['ellipse'] } },
   },
 };
-const textMarkup = `<text data-each="line of lines" data-key="key" x="{{line.x}}" y="{{line.y}}" text-anchor="{{textAnchor}}" fill="{{textColor}}" stroke="none" font-family="{{fontFamily}}" font-size="{{fontSize}}">{{line.text}}</text>`;
+// MDP data-each repeats CHILDREN of its host, not the host itself.
+const textMarkup = `<g data-each="line of lines" data-key="key"><text x="{{line.x}}" y="{{line.y}}" text-anchor="{{textAnchor}}" fill="{{textColor}}" stroke="none" font-family="{{fontFamily}}" font-size="{{fontSize}}">{{line.text}}</text></g>`;
 const rectMarkup = `<rect x="1" y="1" width="{{bodyWidth}}" height="{{bodyHeight}}" rx="4" fill="{{fill}}" stroke="{{stroke}}" stroke-width="{{strokeWidth}}"></rect>`;
 function entityTemplate(name: string, content: string): TemplateFile {
   return {
@@ -95,6 +96,10 @@ const timelineProps: Record<string, JsonSchema> = {
     },
   },
 };
+// Repeated subtrees are substitution-only in upstream. Pre-partition marks instead of
+// assuming nested data-if directives execute within a repeated subtree.
+timelineProps.intervalMarks = timelineProps.marks!;
+timelineProps.eventMarks = timelineProps.marks!;
 const timelineMarkup = `
 <line x1="{{axisLeft}}" x2="{{axisRight}}" y1="{{axisY}}" y2="{{axisY}}" stroke="{{stroke}}" stroke-width="{{strokeWidth}}"></line>
 <line data-if="hasOrigin" x1="{{originX}}" x2="{{originX}}" y1="16" y2="{{axisBottom}}" stroke="{{stroke}}" stroke-width="{{strokeWidth}}" stroke-dasharray="4 4"></line>
@@ -106,13 +111,17 @@ const timelineMarkup = `
   <line x1="{{axisLeft}}" x2="{{axisRight}}" y1="{{lane.y}}" y2="{{lane.y}}" stroke="{{stroke}}" stroke-width="{{strokeWidth}}" stroke-opacity="0.2"></line>
   <text x="8" y="{{lane.labelY}}" font-family="{{fontFamily}}" font-size="{{fontSize}}" fill="{{textColor}}">{{lane.label}}</text>
 </g>
-<g data-each="mark of marks" data-key="key" color="{{stroke}}">
-  <g data-if="mark.interval">
+<g data-each="mark of intervalMarks" data-key="key" color="{{stroke}}">
+  <g>
     <line x1="{{mark.x}}" x2="{{mark.endX}}" y1="{{mark.y}}" y2="{{mark.y}}" stroke="{{stroke}}" stroke-width="6"></line>
     <circle cx="{{mark.x}}" cy="{{mark.y}}" r="4" fill="{{mark.startFill}}" stroke="{{stroke}}" stroke-width="{{strokeWidth}}"></circle>
     <circle cx="{{mark.endX}}" cy="{{mark.y}}" r="4" fill="{{mark.endFill}}" stroke="{{stroke}}" stroke-width="{{strokeWidth}}"></circle>
   </g>
-  <circle data-if="mark.event" cx="{{mark.x}}" cy="{{mark.y}}" r="5" fill="{{stroke}}"></circle>
+</g>
+<g data-each="mark of eventMarks" data-key="key">
+  <circle cx="{{mark.x}}" cy="{{mark.y}}" r="5" fill="{{stroke}}"></circle>
+</g>
+<g data-each="mark of marks" data-key="key">
   <text x="{{mark.labelX}}" y="{{mark.labelY}}" text-anchor="{{mark.labelAnchor}}" font-family="{{fontFamily}}" font-size="{{fontSize}}" fill="{{textColor}}">{{mark.label}}</text>
 </g>`;
 
@@ -140,7 +149,7 @@ const linkTemplate: TemplateFile = {
   <path data-role="anchor" d="{{ }}" fill="none" stroke="{{stroke}}" stroke-width="{{lineWidthPx}}" marker-end="url(#sci-arrow)"></path></svg>
   <span class="sci-label" data-if="label" data-role="external-text" data-text-grow-policy="width-only">
   <svg width="{{labelWidth}}" height="{{labelHeight}}" viewBox="0 0 {{labelWidth}} {{labelHeight}}">
-    <text data-each="line of lines" data-key="key" x="{{line.x}}" y="{{line.y}}" text-anchor="middle" fill="{{textColor}}" font-family="{{fontFamily}}" font-size="{{fontSize}}">{{line.text}}</text>
+    <g data-each="line of lines" data-key="key"><text x="{{line.x}}" y="{{line.y}}" text-anchor="middle" fill="{{textColor}}" font-family="{{fontFamily}}" font-size="{{fontSize}}">{{line.text}}</text></g>
   </svg></span></div></template>`,
   css: '.sci-line { display: block; } .sci-label { display: block; width: max-content; line-height: 0; } .sci-label svg { display: block; overflow: visible; }',
 };
@@ -188,7 +197,9 @@ function normalize(element: Record<string, unknown>, tag: string): void {
   const label = typeof element.label === 'string' ? element.label : '';
   const font = value(element, 'fontSize', 16);
   const labelLines = label.split('\n');
-  if (labelLines.length > 128) throw new RangeError('Use at most 128 text lines.');
+  if (labelLines.length > 128) {
+    throw new RangeError('Use at most 128 text lines.');
+  }
   if (tag === 'SciLink') {
     const width = value(element, 'labelWidth', Math.max(24, ...labelLines.map((s) => [...s].length * font * 0.75 + 16)));
     element.labelWidth = width;
@@ -200,7 +211,9 @@ function normalize(element: Record<string, unknown>, tag: string): void {
   const width = value(element, 'width', tag === 'SciTimeline' ? 960 : tag === 'SciOperator' ? 48 : 200);
   let height = value(element, 'height', tag === 'SciOperator' ? 48 : tag === 'SciGroup' ? 260 : 90);
   const dimensions = Array.isArray(element.dimensions) ? element.dimensions as string[] : [];
-  if (dimensions.length) labelLines.push(dimensions.join(' × '));
+  if (dimensions.length) {
+    labelLines.push(dimensions.join(' × '));
+  }
   let anchor = 'middle';
   let textX = width / 2;
   let textY = (height - labelLines.length * font * 1.3) / 2 + font;
@@ -208,13 +221,17 @@ function normalize(element: Record<string, unknown>, tag: string): void {
   if (tag === 'SciGroup' || tag === 'SciText') {
     anchor = 'start'; textX = 12; textY = font + 10;
   }
-  if (tag === 'SciOperator') element.outline = { kind: 'ellipse' };
+  if (tag === 'SciOperator') {
+    element.outline = { kind: 'ellipse' };
+  }
   if (tag === 'SciTensor') {
     shapePath = `M 4 18 H ${width - 18} V ${height - 4} H 4 Z M 4 18 L 18 4 H ${width - 4} V ${height - 18} L ${width - 18} ${height - 4} M ${width - 18} 18 L ${width - 4} 4`;
   }
   if (tag === 'SciMatrix') {
     const bottom = height - font * labelLines.length * 1.3 - 12;
-    if (bottom < 24) throw new RangeError('Increase matrix height to leave space for its labels.');
+    if (bottom < 24) {
+      throw new RangeError('Increase matrix height to leave space for its labels.');
+    }
     const cellW = (width - 16) / 4;
     const cellH = (bottom - 8) / 4;
     shapePath = Array.from({ length: 5 }, (_, i) => `M ${8 + i * cellW} 8 V ${bottom} M 8 ${8 + i * cellH} H ${width - 8}`).join(' ');
@@ -245,6 +262,8 @@ function normalize(element: Record<string, unknown>, tag: string): void {
     element.laneMarks = geometry.lanes.map((lane) => ({ ...lane, labelY: lane.y + font * 0.3 }));
     element.tickMarks = geometry.ticks.map((tick) => ({ ...tick, bottom: tick.y + 6, textY: tick.y - 10 }));
     element.marks = geometry.marks;
+    element.intervalMarks = geometry.marks.filter((mark) => mark.interval);
+    element.eventMarks = geometry.marks.filter((mark) => mark.event);
   }
   element.svgWidth = width; element.svgHeight = height;
   element.bodyWidth = width - 2; element.bodyHeight = height - 2;
@@ -257,9 +276,12 @@ function normalize(element: Record<string, unknown>, tag: string): void {
 export const scientificLibrary = createScientificLibrary();
 export const scientificNormalizers: Record<string, ElementNormalizer> = Object.fromEntries(
   scientificLibrary.manifest.map((tag) => [tag, (element: Record<string, unknown>) => {
-    try { normalize(element, tag); }
-    catch (error) {
-      if (error instanceof RangeError) throw new NormalizationError(error.message);
+    try {
+      normalize(element, tag);
+    } catch (error) {
+      if (error instanceof RangeError) {
+        throw new NormalizationError(error.message);
+      }
       throw error;
     }
   }]),
