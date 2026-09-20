@@ -29,7 +29,7 @@ describe('local SVG registries', () => {
     [], null, 2, 'bad', { plot: 42 }, { plot: 'https://example.org/a.svg' },
     { plot: '/etc/passwd' }, { plot: '../outside.svg' }, { plot: '..\\outside.svg' },
     { constructor: 'plot.svg' }, { plot: 'missing.svg' }, JSON.parse('{"__proto__":"plot.svg"}'),
-  ])('rejects malformed or escaping registry %#', async (input) => {
+  ].map((input) => ({ input })))('rejects malformed or escaping registry %#', async ({ input }) => {
     const s = await setup();
     await s.put(input);
     await expect(loadSvgAssetFiles(s.path)).rejects.toThrow();
