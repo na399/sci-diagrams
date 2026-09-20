@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "synthetic": true,
+  "cases": [
+    {"name":"model","source":"model.json","widthMm":178,"minimumEntities":14,"minimumConnections":9,"requiredText":["Temporal blocks","Patient state","Task query","Bypass"]},
+    {"name":"timeline","source":"timeline.json","widthMm":178,"minimumEntities":3,"minimumConnections":0,"requiredText":["Feature ascertainment","60-day gap","Administrative censoring","Time (day)"]},
+    {"name":"cohort","source":"cohort.json","widthMm":178,"minimumEntities":10,"minimumConnections":9,"requiredText":["Source population","Analysis population","n = 1200"],"conservation":[["source",["eligible","excluded"]],["eligible",["exposed","comparator"]],["comparator",["matched-comparator","unmatched"]],["analysis",["matched-exposed","matched-comparator"]]]}
+  ]
+}
