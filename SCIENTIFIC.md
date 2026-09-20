@@ -2,7 +2,7 @@
 
 This is an Eraser Diagrams fork. MDP, the stock profile, resolver, Chromium measurement and routing remain the foundation. Scientific figures use an opt-in component library, measured composition and strict editable SVG. No separate figure protocol, desktop editor or agent runtime is introduced.
 
-**Status: implementation stack available; release qualification pending.** See [the PR stack](docs/STACK.md) and [qualification gates](docs/QUALIFICATION.md). Committed integration tests are not evidence that they have passed.
+**Status: implementation complete across PRs #1–#9; release qualification pending. All nine PRs are ready for review and remain unmerged.** See [the PR stack](docs/STACK.md) and [qualification gates](docs/QUALIFICATION.md). Committed integration tests are not evidence that they have passed.
 
 ## Run a figure
 
@@ -132,4 +132,4 @@ Not included: arbitrary HTML-to-SVG conversion, automatic general text wrapping,
 
 The `@eraserlabs/*` workspace names remain for development continuity. The fork must not publish packages under the upstream namespace. The inherited publish workflow is guarded in the foundation PR as well as the final cumulative branch. Choosing a fork-owned namespace and publishing a release require a separate explicit decision.
 
-All example figures are synthetic. The [qualification checklist](docs/QUALIFICATION.md), not the existence of source fixtures or draft PRs, determines readiness.
+All example figures are synthetic. The [qualification checklist](docs/QUALIFICATION.md), not the existence of source fixtures or review-ready PRs, determines release readiness.
