@@ -33,6 +33,10 @@ export const ERROR_CODE = {
   // Transport errors (server layer)
   BAD_JSON: 'E_BAD_JSON',
   PAYLOAD_TOO_LARGE: 'E_PAYLOAD_TOO_LARGE',
+  // Export errors surfaced by the diagrams orchestrator.
+  SVG_UNSUPPORTED: 'E_SVG_UNSUPPORTED',
+  SVG_INVALID: 'E_SVG_INVALID',
+  SVG_OVERFLOW: 'E_SVG_OVERFLOW',
 } as const;
 export type ErrorCode = (typeof ERROR_CODE)[keyof typeof ERROR_CODE];
 
@@ -42,6 +46,8 @@ export const WARNING_CODE = {
   UNKNOWN_KEY: 'W_UNKNOWN_KEY',
   CONTENT_SANITIZED: 'W_CONTENT_SANITIZED',
   UNKNOWN_ICON: 'W_UNKNOWN_ICON',
+  SVG_FONT_SIZE: 'W_SVG_FONT_SIZE',
+  SVG_STROKE: 'W_SVG_STROKE',
 } as const;
 export type WarningCode = (typeof WARNING_CODE)[keyof typeof WARNING_CODE];
 
@@ -73,7 +79,7 @@ export interface Issue {
 }
 
 export interface ResolveMeta {
-  /** Entities plus connections — the whole document, however it was submitted. */
+  /** Entities plus connections — the whole document, however it is submitted. */
   elementCount: number;
   iconsInlined: number;
   /** Wall-clock per pipeline stage, milliseconds. `icons` includes loader fetch time. */
@@ -91,15 +97,13 @@ export interface ResolveResult {
   warnings: Issue[];
   /** The resolved nodes — what the browser render stage mounts and measures. */
   entities?: ResolvedEntity[];
-  /** The resolved edges — what the browser render stage routes. */
+  /** The resolved edges — what the browser render stage routes and draws. */
   connections?: ResolvedConnection[];
   /** Icon-name → sanitized SVG sidecar for the names this call's elements reference. */
   icons?: Record<string, string>;
   /**
-   * Every resolved element's pristine authored object, in document order, keyed to the id the
-   * payload and the layout results use. This is the sidecar a measured-JSON output is rebuilt
-   * from: the resolver's own interpretation of the document never leaks into what is handed back
-   * to the author.
+   * Every resolved element's pristine authored source, correlated to the id the
+   * payload and layout results use. This is the sidecar used for measured-JSON output.
    */
   authored?: AuthoredRecord[];
   meta: ResolveMeta;
@@ -123,9 +127,6 @@ export interface TagInfo {
 
 export interface RegistryInfo {
   tags: TagInfo[];
-  /**
-   * The tag dispatched for a tag-less connection in the split `{ entities, connections }` form,
-   * when the library declares one — tool-building consumers can teach an LLM to omit it.
-   */
+  /** The default connection tag for the split document form, when the library declares one. */
   defaultConnectionTag?: string;
 }
