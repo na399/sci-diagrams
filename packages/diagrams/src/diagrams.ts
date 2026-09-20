@@ -1,7 +1,14 @@
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright-core';
-import { buildHtmlDocument, type Box, type SceneLayout } from '@eraserlabs/render';
+import {
+  buildHtmlDocument,
+  serializeSvgScene,
+  type SvgExportOptions,
+  type SvgIssue,
+  type Box,
+  type SceneLayout,
+} from '@eraserlabs/render';
 // Value import is type-only in effect; it also pulls in the window.__eraser global declaration.
 import type { RunResult } from '@eraserlabs/render/browser';
 import { TimeTracker } from '@eraserlabs/utils';
@@ -57,6 +64,10 @@ interface CommonRendererOptions {
   pages?: number;
   /** Pixel density used for Chromium screenshots. */
   deviceScaleFactor?: number;
+  /** Strict SVG settings, used only when an SVG output is requested. */
+  svgOptions?: SvgExportOptions;
+  /** Preserve transparent PNG canvas pixels; explicit component fills are unchanged. */
+  transparentBackground?: boolean;
   /**
    * The outputs a request that omits `outputs` should produce. Defaults to `{ png: true }`. A
    * request's own `outputs` replaces this wholesale — the two are never merged flag by flag.
@@ -80,6 +91,8 @@ export interface OutputRequest {
   html?: boolean;
   /** The diagram as data: elements with their measured geometry and routed connections. */
   json?: boolean;
+  /** Strict vector SVG. Unsupported HTML paint fails instead of being rasterized. */
+  svg?: boolean;
 }
 
 /**
@@ -162,7 +175,8 @@ export type RenderSuccess<R extends OutputSelection = { outputs: { png: true } }
   timingsMs: Record<string, number>;
 } & OutputField<RequestedOutputs<R>, 'png', Buffer> &
   OutputField<RequestedOutputs<R>, 'html', string> &
-  OutputField<RequestedOutputs<R>, 'json', DiagramJson>;
+  OutputField<RequestedOutputs<R>, 'json', DiagramJson> &
+  OutputField<RequestedOutputs<R>, 'svg', string>;
 export type RenderOutcome<R extends OutputSelection = { outputs: { png: true } }> =
   RenderSuccess<R> | RenderFailure;
 
@@ -245,8 +259,8 @@ function toDiagramJson(authored: readonly AuthoredRecord[], layout: SceneLayout)
 /**
  * The orchestrator: warm Chromium, a pool of prepared pages (render IIFE + templates + fonts
  * injected once per page), and a single-argument `render(request)` producing any subset of
- * `{ png, html, json }` from one pass. Per request only `{ entities, connections, icons }` crosses
- * into the page — one evaluate, then one screenshot and/or serialize.
+ * `{ png, html, json, svg }` from one pass. Per request only `{ entities, connections, icons }`
+ * crosses into the page; SVG exports the same applied scene without a second layout.
  */
 export async function createRenderer(options: RendererOptions): Promise<Renderer> {
   const defaultOutputs: OutputRequest = options.outputs ?? { png: true };
@@ -381,6 +395,30 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
           outcome['json'] = toDiagramJson(resolved.authored ?? [], run.layout);
         }
 
+        if (requested.svg) {
+          const serialized = await page.evaluate(serializeSvgScene, options.svgOptions ?? {});
+          const sourcePointers = new Map<unknown, string>();
+          const document = request as unknown as Record<string, unknown>;
+          for (const key of ['elements', 'entities', 'connections']) {
+            const list = document[key];
+            if (Array.isArray(list)) {
+              (list as unknown[]).forEach((source, index) => sourcePointers.set(source, `/${key}/${index}`));
+            }
+          }
+          const paths = new Map((resolved.authored ?? []).map(({ id, source }) => [id, sourcePointers.get(source) ?? '']));
+          const qualify = (issues: SvgIssue[]): Issue[] => issues.map((issue) => ({
+            ...issue,
+            path: issue.elementId ? paths.get(issue.elementId) ?? '' : issue.path,
+          }));
+          const warnings = [...resolved.warnings, ...qualify(serialized.warnings)];
+          if (!serialized.ok) {
+            return { ok: false as const, errors: qualify(serialized.errors), warnings };
+          }
+          outcome['svg'] = serialized.svg;
+          outcome['warnings'] = warnings;
+          tracker.mark('svg');
+        }
+
         if (requested.html) {
           embeddedFontCss ??= staged ? buildEmbeddedFontCss(staged) : '';
           const serialized = await page.evaluate(() => window.__eraser.serialize());
@@ -394,7 +432,10 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
         }
 
         if (requested.png) {
-          outcome['png'] = await page.locator('#eraser-scene').screenshot({ type: 'png' });
+          outcome['png'] = await page.locator('#eraser-scene').screenshot({
+            type: 'png',
+            omitBackground: options.transparentBackground ?? false,
+          });
           tracker.mark('screenshot');
         }
 
