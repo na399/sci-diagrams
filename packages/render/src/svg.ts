@@ -26,10 +26,11 @@ export type SvgExportResult =
 /**
  * Export the already measured/applied Eraser scene, not a second layout of the source.
  *
- * Contract: HTML may position SVG islands but must not paint anything. Every painted element
- * must be in the supported SVG subset. No foreignObject or raster fallback. All helpers live
- * inside this function deliberately: Playwright serializes it into the page without closures.
+ * HTML may position SVG islands but must not paint anything. Every painted element must be
+ * in the supported SVG subset. No foreignObject or raster fallback. Helpers remain inside
+ * this function deliberately: Playwright serializes it into the page without closures.
  * Loading this module in Node is safe; DOM access happens only when the function is called.
+ * This is an export validator, not a substitute for pre-render template/asset sanitization.
  */
 export function serializeSvgScene(options: SvgExportOptions = {}): SvgExportResult {
   const ns = 'http://www.w3.org/2000/svg';
@@ -53,7 +54,9 @@ export function serializeSvgScene(options: SvgExportOptions = {}): SvgExportResu
     errors: [{ code: 'E_SVG_INVALID', severity: 'error', path: '', message }],
     warnings: [],
   });
-  if (options === null || typeof options !== 'object' || Array.isArray(options)) return invalid('SVG options must be an object.');
+  if (options === null || typeof options !== 'object' || Array.isArray(options)) {
+    return invalid('SVG options must be an object.');
+  }
   for (const [key, value] of Object.entries(options)) {
     if (!['widthMm', 'title', 'description', 'background', 'minFontPt', 'minStrokePt'].includes(key)) {
       return invalid(`Unknown SVG export option: ${key}`);
@@ -70,7 +73,9 @@ export function serializeSvgScene(options: SvgExportOptions = {}): SvgExportResu
     return invalid('background must be white or transparent.');
   }
   const scene = document.getElementById('eraser-scene');
-  if (!scene) return invalid('No applied Eraser scene exists. Render a diagram first.');
+  if (!scene) {
+    return invalid('No applied Eraser scene exists. Render a diagram first.');
+  }
   const bounds = scene.getBoundingClientRect();
   if (![bounds.width, bounds.height].every((v) => Number.isFinite(v) && v > 0)) {
     return invalid('The scene must have finite positive dimensions.');
@@ -114,8 +119,18 @@ export function serializeSvgScene(options: SvgExportOptions = {}): SvgExportResu
     'letter-spacing', 'word-spacing', 'text-anchor', 'dominant-baseline',
     'alignment-baseline', 'text-decoration',
   ];
-  const htmlTransparent = (value: string): boolean =>
+  const transparent = (value: string): boolean =>
     value === 'transparent' || value === 'rgba(0, 0, 0, 0)';
+  // Smallest singular value accounts for non-uniform transforms conservatively.
+  const minimumScale = (matrix: DOMMatrix | null): number => {
+    if (!matrix) {
+      return 1;
+    }
+    const sum = matrix.a ** 2 + matrix.b ** 2 + matrix.c ** 2 + matrix.d ** 2;
+    const determinant = matrix.a * matrix.d - matrix.b * matrix.c;
+    const discriminant = Math.max(0, sum ** 2 - 4 * determinant ** 2);
+    return Math.sqrt(Math.max(0, (sum - Math.sqrt(discriminant)) / 2));
+  };
   const hosts = Array.from(scene.children).filter((el) => el.hasAttribute('data-mdp-id'));
   const islands: { source: SVGSVGElement; host: Element; z: number; order: number }[] = [];
   for (const host of hosts) {
@@ -133,20 +148,24 @@ export function serializeSvgScene(options: SvgExportOptions = {}): SvgExportResu
       const matrix = css.transform.match(/^matrix\(([^)]+)\)$/)?.[1]?.split(',').map(Number);
       const translation = css.transform === 'none' ||
         (matrix?.length === 6 && matrix[0] === 1 && matrix[1] === 0 && matrix[2] === 0 && matrix[3] === 1);
-      if (hasText || pseudo || border || !htmlTransparent(css.backgroundColor) ||
+      if (hasText || pseudo || border || !transparent(css.backgroundColor) ||
           css.backgroundImage !== 'none' || css.boxShadow !== 'none' || css.filter !== 'none' ||
-          css.opacity !== '1' || !translation) {
-        issue('E_SVG_UNSUPPORTED', 'HTML paint or a non-translation HTML transform cannot be exported. Use a vector-safe template.', host);
+          css.opacity !== '1' || !translation || css.overflowX !== 'visible' || css.overflowY !== 'visible') {
+        issue('E_SVG_UNSUPPORTED', 'HTML paint, clipping, or a non-translation HTML transform cannot be exported. Use a vector-safe template.', host);
         break;
       }
     }
     const svgRoots = Array.from(host.querySelectorAll('svg')).filter((svg) => !svg.parentElement?.closest('svg'));
-    if (!svgRoots.length) issue('E_SVG_UNSUPPORTED', 'This template contains no exportable SVG island.', host);
+    if (!svgRoots.length) {
+      issue('E_SVG_UNSUPPORTED', 'This template contains no exportable SVG island.', host);
+    }
     for (const source of svgRoots) {
       let z = 0;
       for (let el: Element | null = source; el && el !== scene; el = el.parentElement) {
         const value = Number.parseInt(getComputedStyle(el).zIndex, 10);
-        if (Number.isFinite(value)) z = Math.max(z, value);
+        if (Number.isFinite(value)) {
+          z = Math.max(z, value);
+        }
       }
       islands.push({ source, host, z, order: islands.length });
     }
@@ -160,7 +179,9 @@ export function serializeSvgScene(options: SvgExportOptions = {}): SvgExportResu
     const ids = new Map<string, string>();
     for (const el of originals) {
       if (el.id) {
-        if (ids.has(el.id)) issue('E_SVG_INVALID', `Duplicate resource id: ${el.id}`, host);
+        if (ids.has(el.id)) {
+          issue('E_SVG_INVALID', `Duplicate resource id: ${el.id}`, host);
+        }
         ids.set(el.id, `sci-${order}-${ids.size}`);
       }
     }
@@ -179,8 +200,10 @@ export function serializeSvgScene(options: SvgExportOptions = {}): SvgExportResu
         continue;
       }
       const css = getComputedStyle(original);
-      if (css.filter !== 'none' || (css.transform !== 'none' && (!original.hasAttribute('transform') || original === source))) {
-        issue('E_SVG_UNSUPPORTED', 'SVG filters and CSS-only transforms are not supported.', host);
+      if (css.filter !== 'none' || css.boxShadow !== 'none' || css.textShadow !== 'none' ||
+          css.mixBlendMode !== 'normal' ||
+          (css.transform !== 'none' && (!original.hasAttribute('transform') || original === source))) {
+        issue('E_SVG_UNSUPPORTED', 'SVG filters, shadows, blend modes, and CSS-only transforms are not supported.', host);
       }
       for (const attribute of Array.from(copy.attributes)) {
         const name = attribute.name;
@@ -208,7 +231,9 @@ export function serializeSvgScene(options: SvgExportOptions = {}): SvgExportResu
       const fields = original.localName === 'text' || original.localName === 'tspan' ? [...paint, ...typography] : paint;
       for (const property of fields) {
         const value = css.getPropertyValue(property).trim();
-        if (value) copy.setAttribute(property, reference(value));
+        if (value) {
+          copy.setAttribute(property, reference(value));
+        }
       }
       if (original.localName === 'text') {
         const text = original.getBoundingClientRect();
@@ -219,13 +244,19 @@ export function serializeSvgScene(options: SvgExportOptions = {}): SvgExportResu
         }
       }
       const matrix = original instanceof SVGGraphicsElement ? original.getScreenCTM() : null;
-      const scale = matrix ? Math.sqrt(Math.max(0, (matrix.a ** 2 + matrix.b ** 2 + matrix.c ** 2 + matrix.d ** 2 - Math.sqrt(Math.max(0, (matrix.a ** 2 + matrix.b ** 2 + matrix.c ** 2 + matrix.d ** 2) ** 2 - 4 * (matrix.a * matrix.d - matrix.b * matrix.c) ** 2))) / 2)) : 1;
+      const scale = minimumScale(matrix);
       if (original.localName === 'text' || original.localName === 'tspan') {
         const size = Number.parseFloat(css.fontSize);
-        if (Number.isFinite(size)) minimumFont = Math.min(minimumFont, size * scale * ptPerPx);
+        if (Number.isFinite(size)) {
+          minimumFont = Math.min(minimumFont, size * scale * ptPerPx);
+        }
       }
       const stroke = Number.parseFloat(css.strokeWidth);
-      if (['path', 'rect', 'line', 'polyline', 'polygon', 'circle', 'ellipse', 'text'].includes(original.localName) && css.stroke !== 'none' && stroke > 0 && Number.isFinite(stroke)) minimumStroke = Math.min(minimumStroke, stroke * (css.getPropertyValue('vector-effect') === 'non-scaling-stroke' ? 1 : scale) * ptPerPx);
+      if (['path', 'rect', 'line', 'polyline', 'polygon', 'circle', 'ellipse', 'text'].includes(original.localName) &&
+          css.stroke !== 'none' && stroke > 0 && Number.isFinite(stroke)) {
+        const strokeScale = css.getPropertyValue('vector-effect') === 'non-scaling-stroke' ? 1 : scale;
+        minimumStroke = Math.min(minimumStroke, stroke * strokeScale * ptPerPx);
+      }
     }
     const box = source.getBoundingClientRect();
     clone.setAttribute('x', round(box.left - bounds.left));
@@ -239,8 +270,14 @@ export function serializeSvgScene(options: SvgExportOptions = {}): SvgExportResu
     group.appendChild(clone);
     root.appendChild(group);
   }
-  if (minimumFont < (options.minFontPt ?? 7)) issue('W_SVG_FONT_SIZE', `Minimum text size at export width is ${round(minimumFont)} pt.`);
-  if (minimumStroke < (options.minStrokePt ?? 0.5)) issue('W_SVG_STROKE', `Minimum stroke at export width is ${round(minimumStroke)} pt.`);
-  if (errors.length) return { ok: false, errors, warnings };
+  if (minimumFont < (options.minFontPt ?? 7)) {
+    issue('W_SVG_FONT_SIZE', `Minimum text size at export width is ${round(minimumFont)} pt.`);
+  }
+  if (minimumStroke < (options.minStrokePt ?? 0.5)) {
+    issue('W_SVG_STROKE', `Minimum stroke at export width is ${round(minimumStroke)} pt.`);
+  }
+  if (errors.length) {
+    return { ok: false, errors, warnings };
+  }
   return { ok: true, svg: new XMLSerializer().serializeToString(root), warnings };
 }
