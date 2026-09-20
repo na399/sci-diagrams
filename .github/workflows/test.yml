@@ -22,21 +22,27 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: node tools/release.mjs check
-      # Several vitest suites drive real Chromium (diagrams, cli, server).
+      - name: Install PDF inspection tools
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils
+      # Browser/version pin comes from the repository lockfile, not a developer's system Chrome.
       - run: pnpm --filter @eraserlabs/diagrams exec playwright install chromium --with-deps
       - run: pnpm build
       - run: pnpm typecheck
+      - run: pnpm -r typecheck
       - run: pnpm depcruise
       - run: pnpm lint
       - run: pnpm test
-      - run: pnpm --filter @eraserlabs/diagrams exec playwright test test/scientific-svg.spec.ts
-      - name: Scientific figure previews and test report
+      # Includes legacy browser regressions and all scientific stack integration suites.
+      - run: pnpm test:e2e
+      - name: Scientific figures and browser reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: scientific-svg-results
+          name: scientific-stack-results
           if-no-files-found: ignore
           retention-days: 14
           path: |
             packages/diagrams/test-results
             packages/diagrams/playwright-report
+            packages/render/test-results
+            packages/render/playwright-report
