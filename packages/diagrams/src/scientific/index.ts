@@ -6,16 +6,17 @@ import { withCompositionSchemas, normalizePlacement } from './layoutProfile.js';
 import { extendScientificPrimitives, extendPrimitiveNormalizers } from './primitives.js';
 import { extendDomainLibrary, extendDomainNormalizers } from './domain.js';
 import { withPublicationFonts } from './publicationProfile.js';
+import { withSvgAssetComponent } from './assetProfile.js';
 export { arrange, linearPosition, timelineGeometry } from './geometry.js';
 export type { Arrangement, PositionedEntity, TimelineInput, TimelineItem, TimelineLane } from './geometry.js';
 export { annotationGeometry } from './primitives.js';
 export { sequenceGeometry, repeatGeometry } from './domain.js';
 export function createScientificLibrary(theme: 'publication' | 'web' = 'publication') {
-  return withPublicationFonts(withCompositionSchemas(withNamedPortSchemas(extendDomainLibrary(extendScientificPrimitives(createBaseLibrary(theme))))));
+  return withSvgAssetComponent(withPublicationFonts(withCompositionSchemas(withNamedPortSchemas(extendDomainLibrary(extendScientificPrimitives(createBaseLibrary(theme)))))));
 }
 export const scientificLibrary = createScientificLibrary();
 export const scientificNormalizers: Record<string, (element: Record<string, unknown>) => void> = Object.fromEntries(
-  Object.entries(extendDomainNormalizers(extendPrimitiveNormalizers(baseNormalizers))).map(([tag, normalize]) => [tag,
+  Object.entries({ ...extendDomainNormalizers(extendPrimitiveNormalizers(baseNormalizers)), SciSvgAsset: baseNormalizers.SciBlock! }).map(([tag, normalize]) => [tag,
     (element: Record<string, unknown>): void => {
       try { if ((scientificLibrary.schemas[tag] as Record<string, unknown>)['x-schema-kind'] === 'entity') { normalizePlacement(element); } validateNamedPorts(element.ports, String(element.id)); normalize(element); }
       catch (error) { if (error instanceof PortError) { throw new NormalizationError(error.message, `/${error.property}`); } if (error instanceof RangeError) { throw new NormalizationError(error.message); } throw error; }

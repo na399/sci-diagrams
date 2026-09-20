@@ -6,3 +6,4 @@ export * from './ports.js';
 export * from './composition.js';
 export * from './svgSafety.js';
 export * from './publication.js';
+export * from './svgAssets.js';
