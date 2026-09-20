@@ -1,0 +1,25 @@
+{
+  "entities": [
+    {"tag":"SciText","id":"title","x":20,"y":8,"width":1000,"height":42,"label":"Cohort definition: illustrative relative-day windows","fontSize":22},
+    {
+      "tag":"SciTimeline","id":"timeline","x":20,"y":68,"width":1000,
+      "start":-365,"end":90,"origin":0,"ticks":[-365,-180,-60,0,30,90],
+      "lanes":[
+        {"id":"baseline","label":"Predictors"},
+        {"id":"gap","label":"Exclusion gap"},
+        {"id":"index","label":"Index"},
+        {"id":"risk","label":"Outcome"},
+        {"id":"followup","label":"Follow-up"}
+      ],
+      "items":[
+        {"id":"ascertain","lane":"baseline","kind":"interval","start":-365,"end":-60,"label":"Feature ascertainment","closed":"left"},
+        {"id":"gap","lane":"gap","kind":"interval","start":-60,"end":0,"label":"60 days","closed":"left"},
+        {"id":"index-event","lane":"index","kind":"event","start":0,"label":"Index event"},
+        {"id":"risk","lane":"risk","kind":"interval","start":0,"end":30,"label":"30 days","closed":"both"},
+        {"id":"followup","lane":"followup","kind":"interval","start":0,"end":90,"label":"90 days","closed":"both"}
+      ]
+    },
+    {"tag":"SciText","id":"legend","x":20,"y":470,"width":1000,"height":66,"label":"Days relative to index; solid endpoints are included, hollow endpoints excluded.\nSynthetic study schematic, not patient data.","fontSize":16}
+  ],
+  "connections": []
+}

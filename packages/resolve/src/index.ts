@@ -5,6 +5,8 @@ import type {
   Issue,
   TagInfo,
 } from './result-types.js';
+import { ERROR_CODE, SEVERITY } from './result-types.js';
+import { NormalizationError } from './normalization-error.js';
 import type { Resolver, ResolverSetup } from './types.js';
 import { compileSchemas } from './schema/compile.js';
 import { prepareLibrary } from './library/prepare.js';
@@ -20,6 +22,7 @@ import { stageIcons, type IconMode, type IconCache } from './pipeline/icons.js';
 import { buildResolvedPayload } from './pipeline/emit.js';
 import { TimeTracker } from '@eraserlabs/utils';
 
+export { NormalizationError } from './normalization-error.js';
 export type {
   Resolver,
   ResolverSetup,
@@ -137,7 +140,25 @@ export async function createResolver(setup: ResolverSetup): Promise<Resolver> {
       errors.push(
         ...normalizeAnnotatedProps(item, compiled.policyTables[item.tag] ?? [], library.palette),
       );
-      deriveProps(item.element, item.tag, setup.normalizers);
+      // Normalizers may assume their tag's schema. Do not feed a rejected object into them.
+      if (errors.some((error) => error.path === item.path || error.path.startsWith(`${item.path}/`))) {
+        continue;
+      }
+      try {
+        deriveProps(item.element, item.tag, setup.normalizers);
+      } catch (error) {
+        if (!(error instanceof NormalizationError)) {
+          throw error;
+        }
+        errors.push({
+          code: ERROR_CODE.SCHEMA,
+          severity: SEVERITY.ERROR,
+          path: `${item.path}${error.path}`,
+          elementIndex: item.index,
+          tag: item.tag,
+          message: error.message,
+        });
+      }
     }
     tracker.mark('schema');
 

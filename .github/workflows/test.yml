@@ -6,9 +6,13 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -21,4 +25,18 @@ jobs:
       # Several vitest suites drive real Chromium (diagrams, cli, server).
       - run: pnpm --filter @eraserlabs/diagrams exec playwright install chromium --with-deps
       - run: pnpm build
+      - run: pnpm typecheck
+      - run: pnpm depcruise
+      - run: pnpm lint
       - run: pnpm test
+      - run: pnpm --filter @eraserlabs/diagrams exec playwright test test/scientific-svg.spec.ts
+      - name: Scientific figure previews and test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scientific-svg-results
+          if-no-files-found: ignore
+          retention-days: 14
+          path: |
+            packages/diagrams/test-results
+            packages/diagrams/playwright-report
