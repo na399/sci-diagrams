@@ -17,7 +17,9 @@ concurrency:
 
 jobs:
   publish:
-    if: github.ref == 'refs/heads/main'
+    # Fork packages retain upstream names for development only. A fork release needs
+    # an explicit namespace and a separate reviewed publication workflow.
+    if: github.repository == 'eraserlabs/eraser-diagrams' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
