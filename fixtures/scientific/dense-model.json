@@ -1,0 +1,32 @@
+{
+  "entities": [
+    {"tag":"SciText","id":"title","x":20,"y":0,"width":1080,"height":50,"label":"Multimodal model with residual fusion (illustrative)","fontSize":22},
+    {"tag":"SciGroup","id":"fusion","x":260,"y":60,"width":800,"height":690,"label":"Model boundary","fontSize":18},
+    {"tag":"SciTensor","id":"visits","x":20,"y":150,"width":200,"height":110,"label":"Visit sequence","dimensions":["T","d"]},
+    {"tag":"SciTensor","id":"notes","x":20,"y":325,"width":200,"height":110,"label":"Note representation","dimensions":["T","p"]},
+    {"tag":"SciTensor","id":"static","x":20,"y":500,"width":200,"height":110,"label":"Static features","dimensions":["s"]},
+    {"tag":"SciBlock","id":"temporal","x":310,"y":170,"width":240,"height":74,"label":"Temporal encoder","containerId":"fusion"},
+    {"tag":"SciBlock","id":"note-encoder","x":310,"y":345,"width":240,"height":74,"label":"Text projection","containerId":"fusion"},
+    {"tag":"SciBlock","id":"static-encoder","x":310,"y":520,"width":240,"height":74,"label":"Feature projection","containerId":"fusion"},
+    {"tag":"SciOperator","id":"merge","x":625,"y":352,"width":56,"height":56,"label":"⊕","fontSize":26,"containerId":"fusion"},
+    {"tag":"SciBlock","id":"gate","x":765,"y":343,"width":240,"height":74,"label":"Gated fusion","containerId":"fusion"},
+    {"tag":"SciOperator","id":"residual","x":858,"y":540,"width":56,"height":56,"label":"+","fontSize":26,"containerId":"fusion"},
+    {"tag":"SciBlock","id":"head","x":765,"y":660,"width":240,"height":64,"label":"Task-specific head","containerId":"fusion"},
+    {"tag":"SciMatrix","id":"outputs","x":770,"y":830,"width":230,"height":155,"label":"Predictions","dimensions":["K"]},
+    {"tag":"SciDimension","id":"dimensions","x":300,"y":775,"width":400,"height":54,"label":"shared representation, d = 384","fontSize":16},
+    {"tag":"SciBrace","id":"repeat","x":295,"y":90,"width":260,"height":72,"label":"repeatable processing stages","fontSize":14,"containerId":"fusion"}
+  ],
+  "connections": [
+    {"id":"visit-flow","tag":"SciLink","from":"visits","to":"temporal","fromPort":"right","toPort":"left"},
+    {"id":"note-flow","tag":"SciLink","from":"notes","to":"note-encoder","fromPort":"right","toPort":"left"},
+    {"id":"static-flow","tag":"SciLink","from":"static","to":"static-encoder","fromPort":"right","toPort":"left"},
+    {"id":"temporal-merge","tag":"SciLink","from":"temporal","to":"merge","fromPort":"right","toPort":"top"},
+    {"id":"note-merge","tag":"SciLink","from":"note-encoder","to":"merge","fromPort":"right","toPort":"left"},
+    {"id":"static-merge","tag":"SciLink","from":"static-encoder","to":"merge","fromPort":"right","toPort":"bottom"},
+    {"id":"merge-gate","tag":"SciLink","from":"merge","to":"gate","fromPort":"right","toPort":"left"},
+    {"id":"gate-add","tag":"SciLink","from":"gate","to":"residual","fromPort":"bottom","toPort":"top"},
+    {"id":"bypass","tag":"SciLink","from":"merge","to":"residual","fromPort":"bottom","toPort":"left","label":"skip","labelWidth":52},
+    {"id":"head-flow","tag":"SciLink","from":"residual","to":"head","fromPort":"bottom","toPort":"top"},
+    {"id":"prediction-flow","tag":"SciLink","from":"head","to":"outputs","fromPort":"bottom","toPort":"top"}
+  ]
+}
