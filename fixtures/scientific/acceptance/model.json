@@ -1,0 +1,30 @@
+{
+  "title": "Detailed multimodal model: synthetic architecture",
+  "entities": [
+    {"tag":"SciPanel","id":"model-figure","label":"A. Multimodal model (synthetic)","fontSize":22,"strokeWidth":1.6,"x":20,"y":20,"width":1040,"height":120,"layout":{"type":"column","gap":32,"padding":20,"header":44}},
+    {"tag":"SciGroup","id":"inputs","label":"Inputs","fontSize":22,"strokeWidth":1.6,"containerId":"model-figure","width":980,"height":100,"layout":{"type":"row","gap":28,"padding":16,"header":36}},
+    {"tag":"SciSequence","id":"history","label":"Visit sequence","fontSize":22,"strokeWidth":1.6,"containerId":"inputs","width":460,"height":130,"items":[{"id":"v1","label":"V1"},{"id":"v2","label":"V2"},{"id":"v3","label":"V3"},{"id":"v4","label":"V4"}],"ports":[{"id":"history","x":0.5,"y":1}]},
+    {"tag":"SciBlock","id":"notes","label":"Clinical notes","fontSize":22,"strokeWidth":1.6,"containerId":"inputs","width":200,"height":130,"ports":[{"id":"notes","x":0.5,"y":1}]},
+    {"tag":"SciTensor","id":"static","label":"Static features","fontSize":22,"strokeWidth":1.6,"containerId":"inputs","width":220,"height":130,"dimensions":["d_static"]},
+    {"tag":"SciGroup","id":"encoders","label":"Representation","fontSize":22,"strokeWidth":1.6,"containerId":"model-figure","width":980,"height":100,"layout":{"type":"row","gap":44,"padding":20,"header":40}},
+    {"tag":"SciRepeat","id":"temporal","label":"Temporal blocks","fontSize":22,"strokeWidth":1.6,"containerId":"encoders","width":260,"height":150,"repeatCount":8,"visibleCount":3,"ports":[{"id":"history","x":0.5,"y":0},{"id":"state","x":0.5,"y":1}]},
+    {"tag":"SciBlock","id":"text-encoder","label":"Text encoder\nfrozen","fontSize":22,"strokeWidth":1.6,"containerId":"encoders","width":240,"height":150,"ports":[{"id":"text","x":0.5,"y":0}]},
+    {"tag":"SciBlock","id":"fusion","label":"Fusion\nconcat + projection","fontSize":22,"strokeWidth":1.6,"containerId":"encoders","width":280,"height":150,"ports":[{"id":"static","x":1,"y":0.25},{"id":"text","x":0,"y":0.65},{"id":"output","x":0.5,"y":1}]},
+    {"tag":"SciGroup","id":"readout","label":"Task-specific readout","fontSize":22,"strokeWidth":1.6,"containerId":"model-figure","width":980,"height":100,"layout":{"type":"row","gap":56,"padding":20,"header":40}},
+    {"tag":"SciTensor","id":"state","label":"Patient state","fontSize":22,"strokeWidth":1.6,"containerId":"readout","width":240,"height":140,"dimensions":["B","d"],"ports":[{"id":"temporal","x":0.25,"y":0},{"id":"fusion","x":0.75,"y":0},{"id":"query","x":1,"y":0.35},{"id":"bypass","x":1,"y":0.8}]},
+    {"tag":"SciBlock","id":"query","label":"Task query\nreader","fontSize":22,"strokeWidth":1.6,"containerId":"readout","width":240,"height":140,"ports":[{"id":"input","x":0,"y":0.35},{"id":"output","x":1,"y":0.35}]},
+    {"tag":"SciBlock","id":"prediction","label":"Prediction\ncalibrated head","fontSize":22,"strokeWidth":1.6,"containerId":"readout","width":280,"height":140,"ports":[{"id":"reader","x":0,"y":0.35},{"id":"bypass","x":0,"y":0.8}]},
+    {"tag":"SciDimension","id":"dimension","label":"d = 384 (illustrative)","fontSize":22,"strokeWidth":1.6,"containerId":"model-figure","width":480,"height":72,"orientation":"horizontal"}
+  ],
+  "connections": [
+    {"tag":"SciLink","id":"history-flow","from":"history","to":"temporal","fontSize":20,"strokeWidth":1.6,"fromPort":"history","toPort":"history"},
+    {"tag":"SciLink","id":"notes-flow","from":"notes","to":"text-encoder","fontSize":20,"strokeWidth":1.6,"fromPort":"notes","toPort":"text"},
+    {"tag":"SciLink","id":"static-flow","from":"static","to":"fusion","fontSize":20,"strokeWidth":1.6,"fromPort":"bottom","toPort":"static"},
+    {"tag":"SciLink","id":"text-fusion","from":"text-encoder","to":"fusion","fontSize":20,"strokeWidth":1.6,"fromPort":"right","toPort":"text"},
+    {"tag":"SciLink","id":"temporal-state","from":"temporal","to":"state","fontSize":20,"strokeWidth":1.6,"fromPort":"state","toPort":"temporal"},
+    {"tag":"SciLink","id":"fusion-state","from":"fusion","to":"state","fontSize":20,"strokeWidth":1.6,"fromPort":"output","toPort":"fusion"},
+    {"tag":"SciLink","id":"query-flow","from":"state","to":"query","fontSize":20,"strokeWidth":1.6,"fromPort":"query","toPort":"input"},
+    {"tag":"SciLink","id":"prediction-flow","from":"query","to":"prediction","fontSize":20,"strokeWidth":1.6,"fromPort":"output","toPort":"reader"},
+    {"tag":"SciLink","id":"residual-flow","from":"state","to":"prediction","fontSize":20,"strokeWidth":1.6,"fromPort":"bypass","toPort":"bypass","label":"Bypass","lineStyle":"dashed"}
+  ]
+}

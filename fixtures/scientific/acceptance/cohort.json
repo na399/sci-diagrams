@@ -1,0 +1,26 @@
+{
+  "title": "Cohort construction: synthetic counts",
+  "entities": [
+    {"tag":"SciPanel","id":"cohort-figure","label":"C. Cohort selection (synthetic counts)","fontSize":22,"strokeWidth":1.6,"x":20,"y":20,"width":1230,"height":960},
+    {"tag":"SciBlock","id":"source","label":"Source population\nn = 2000","fontSize":22,"strokeWidth":1.6,"containerId":"cohort-figure","x":400,"y":95,"width":300,"height":100},
+    {"tag":"SciBlock","id":"eligible","label":"Eligible population\nn = 1500","fontSize":22,"strokeWidth":1.6,"containerId":"cohort-figure","x":400,"y":275,"width":300,"height":100},
+    {"tag":"SciCallout","id":"excluded","label":"Excluded\nn = 500","fontSize":22,"strokeWidth":1.6,"containerId":"cohort-figure","x":820,"y":185,"width":260,"height":116},
+    {"tag":"SciBlock","id":"exposed","label":"Exposed\nn = 600","fontSize":22,"strokeWidth":1.6,"containerId":"cohort-figure","x":100,"y":455,"width":300,"height":100},
+    {"tag":"SciBlock","id":"comparator","label":"Comparator candidates\nn = 900","fontSize":22,"strokeWidth":1.6,"containerId":"cohort-figure","x":660,"y":455,"width":300,"height":100},
+    {"tag":"SciBlock","id":"matched-exposed","label":"Matched exposed\nn = 600","fontSize":22,"strokeWidth":1.6,"containerId":"cohort-figure","x":100,"y":665,"width":300,"height":100},
+    {"tag":"SciBlock","id":"matched-comparator","label":"Matched comparator\nn = 600","fontSize":22,"strokeWidth":1.6,"containerId":"cohort-figure","x":660,"y":665,"width":300,"height":100},
+    {"tag":"SciCallout","id":"unmatched","label":"Unmatched\nn = 300","fontSize":22,"strokeWidth":1.6,"containerId":"cohort-figure","x":1010,"y":620,"width":210,"height":116},
+    {"tag":"SciBlock","id":"analysis","label":"Analysis population\nn = 1200","fontSize":22,"strokeWidth":1.6,"containerId":"cohort-figure","x":395,"y":835,"width":350,"height":100}
+  ],
+  "connections": [
+    {"tag":"SciLink","id":"eligible-flow","from":"source","to":"eligible","fontSize":20,"strokeWidth":1.6,"fromPort":"bottom","toPort":"top"},
+    {"tag":"SciLink","id":"excluded-flow","from":"source","to":"excluded","fontSize":20,"strokeWidth":1.6,"fromPort":"right","toPort":"left","lineStyle":"dashed"},
+    {"tag":"SciLink","id":"exposed-flow","from":"eligible","to":"exposed","fontSize":20,"strokeWidth":1.6,"fromPort":"left","toPort":"top"},
+    {"tag":"SciLink","id":"comparator-flow","from":"eligible","to":"comparator","fontSize":20,"strokeWidth":1.6,"fromPort":"right","toPort":"top"},
+    {"tag":"SciLink","id":"match-exposed","from":"exposed","to":"matched-exposed","fontSize":20,"strokeWidth":1.6,"fromPort":"bottom","toPort":"top","label":"Match"},
+    {"tag":"SciLink","id":"match-comparator","from":"comparator","to":"matched-comparator","fontSize":20,"strokeWidth":1.6,"fromPort":"bottom","toPort":"top","label":"Match"},
+    {"tag":"SciLink","id":"unmatched-flow","from":"comparator","to":"unmatched","fontSize":20,"strokeWidth":1.6,"fromPort":"right","toPort":"top","lineStyle":"dashed"},
+    {"tag":"SciLink","id":"analysis-exposed","from":"matched-exposed","to":"analysis","fontSize":20,"strokeWidth":1.6,"fromPort":"bottom","toPort":"left"},
+    {"tag":"SciLink","id":"analysis-comparator","from":"matched-comparator","to":"analysis","fontSize":20,"strokeWidth":1.6,"fromPort":"bottom","toPort":"right"}
+  ]
+}
