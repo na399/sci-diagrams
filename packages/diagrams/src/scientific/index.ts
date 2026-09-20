@@ -266,8 +266,9 @@ function normalize(element: Record<string, unknown>, tag: string): void {
     element.laneMarks = geometry.lanes.map((lane) => ({ ...lane, labelY: lane.y + font * 0.3 }));
     element.tickMarks = geometry.ticks.map((tick) => ({ ...tick, bottom: tick.y + 6, textY: tick.y - 10 }));
     element.marks = geometry.marks;
-    element.intervalMarks = geometry.marks.filter((mark) => mark.interval);
-    element.eventMarks = geometry.marks.filter((mark) => mark.event);
+    // Sanitization visits each schema path. Shared objects would escape the same label twice.
+    element.intervalMarks = geometry.marks.filter((mark) => mark.interval).map((mark) => ({ ...mark }));
+    element.eventMarks = geometry.marks.filter((mark) => mark.event).map((mark) => ({ ...mark }));
   }
   element.svgWidth = width; element.svgHeight = height;
   element.bodyWidth = width - 2; element.bodyHeight = height - 2;
