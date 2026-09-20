@@ -2,7 +2,7 @@
 
 ## Current status
 
-The implementation is present across PRs #1–#9. All remain draft. The cumulative branch is `stack/09-pdf-release`.
+The implementation is complete across PRs #1–#9 and every PR is ready for review. The cumulative branch is `stack/09-pdf-release`. None of the PRs has been merged or published.
 
 The implementation environment could read/write GitHub through the connector but could not resolve GitHub/npm hosts for a full checkout and dependency installation. No GitHub Actions runs were visible when checked on 2026-09-20. Consequently **full-workspace build, type checks, lint, unit tests, native CLI integration and renderer integration are not reported as passing**.
 
@@ -58,7 +58,7 @@ For a reproducibility receipt, record the source/asset/theme hashes, commit, Nod
 
 ## Merge and release
 
-Do not merge solely because the stack has implementation commits. Run the cumulative gates first, then review the small diffs bottom-up.
+The implementation stack is review-ready, but do not merge solely because the feature work is complete. Run the cumulative gates first, then review the small diffs bottom-up.
 
 A low-friction merge strategy is a regular merge commit for #1, retarget #2 to `main`, merge it, then repeat through #9. This preserves ancestry. Squashing/rebasing parent PRs requires restacking descendants; do not force-update branches that have acquired other work.
 
