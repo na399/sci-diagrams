@@ -14,7 +14,7 @@ import { buildEmbeddedFontCss } from './fonts/embed.js';
 import { eraserFonts } from './fonts/eraserFonts.js';
 import { runWithDiagnostics, runtimeIssue, sourcePaths } from './browserRun.js';
 export type BrowserProvider = () => Promise<Browser>;
-interface CommonRendererOptions { library?: AuthoredLibrary; overrides?: TemplateOverrides; normalizers?: Record<string, ElementNormalizer>; iconLoader?: IconLoader; fonts?: FontsConfig; onUnknownIcon?: 'placeholder' | 'error'; pages?: number; deviceScaleFactor?: number; svgOptions?: SvgExportOptions; transparentBackground?: boolean; outputs?: OutputRequest }
+interface CommonRendererOptions { library?: AuthoredLibrary; overrides?: TemplateOverrides; normalizers?: Record<string, ElementNormalizer>; iconLoader?: IconLoader; fonts?: FontsConfig; onUnknownIcon?: 'placeholder' | 'error'; pages?: number; deviceScaleFactor?: number; svgOptions?: SvgExportOptions; transparentBackground?: boolean; svgAssets?: Record<string, string>; outputs?: OutputRequest }
 export type RendererOptions = CommonRendererOptions & ({ chromiumPath: string; browser?: never } | { browser: BrowserProvider; chromiumPath?: never });
 export interface OutputRequest { png?: boolean; html?: boolean; json?: boolean; svg?: boolean }
 export type DiagramJsonEntity = AuthoredEntity; export type DiagramJsonConnection = AuthoredConnection; export type DiagramJsonElement = DiagramJsonEntity | DiagramJsonConnection;
@@ -28,7 +28,6 @@ export type RenderSuccess<R extends OutputSelection = { outputs: { png: true } }
 export type RenderOutcome<R extends OutputSelection = { outputs: { png: true } }> = RenderSuccess<R> | RenderFailure;
 export interface Renderer { render<const R extends RenderRequest>(request: R): Promise<RenderOutcome<R>>; lintSvg(svg: string, options?: PublicationOptions): Promise<PublicationReport>; validate(input: unknown): Promise<ValidationResult>; registryInfo(): RegistryInfo; tagSchema(tag: string): object | undefined; degradedFonts: string[]; close(): Promise<void> }
 const require = createRequire(import.meta.url);
-/** Persist author values plus measured geometry, never resolved paint or sanitized content. */
 function toDiagramJson(authored: readonly AuthoredRecord[], layout: SceneLayout, flowIds: readonly string[] = []): DiagramJson {
   const entities: DiagramJsonEntity[] = []; const connections: DiagramJsonConnection[] = []; const flow = new Set(flowIds);
   for (const { id, kind, source } of authored) {
@@ -40,6 +39,8 @@ function toDiagramJson(authored: readonly AuthoredRecord[], layout: SceneLayout,
   return { entities, connections, scene: layout.scene };
 }
 export async function createRenderer(options: RendererOptions): Promise<Renderer> {
+  const svgAssets = { ...(options.svgAssets ?? {}) };
+  if (Object.keys(svgAssets).length > 128 || Object.entries(svgAssets).some(([key, value]) => !/^[A-Za-z][A-Za-z0-9_.-]{0,127}$/.test(key) || typeof value !== 'string') || Buffer.byteLength(JSON.stringify(svgAssets)) > 20 * 1024 * 1024) { throw new TypeError('Invalid or oversized SVG asset registry.'); }
   const defaultOutputs: OutputRequest = options.outputs ?? { png: true };
   const browserProvider: BrowserProvider | undefined = options.browser ?? (options.chromiumPath ? () => chromium.launch({ executablePath: options.chromiumPath, args: ['--disable-features=LocalNetworkAccessChecks,BlockInsecurePrivateNetworkRequests'] }) : undefined);
   if (!browserProvider) { throw new TypeError('createRenderer requires either chromiumPath or browser.'); }
@@ -61,15 +62,13 @@ export async function createRenderer(options: RendererOptions): Promise<Renderer
       if (!resolved.ok) { return { ok: false as const, errors: resolved.errors, warnings: resolved.warnings }; }
       const paths = sourcePaths(request, resolved.authored ?? []); const page = await acquire();
       try {
-        tracker.reset(); const checked = await page.evaluate(runWithDiagnostics, { entities: resolved.entities ?? [], connections: resolved.connections ?? [], icons: resolved.icons ?? {} }); tracker.mark('browserRun');
+        tracker.reset(); const checked = await page.evaluate(runWithDiagnostics, { entities: resolved.entities ?? [], connections: resolved.connections ?? [], icons: resolved.icons ?? {}, svgAssets }); tracker.mark('browserRun');
         if (!checked.ok) { return { ok: false as const, errors: [runtimeIssue(checked.failure, paths)], warnings: resolved.warnings }; }
-        const run = checked.result; const outcome: Record<string, unknown> = { ok: true, warnings: resolved.warnings, timingsMs: tracker.timings };
+        const run = checked.result;
+        const baseWarnings: Issue[] = [...resolved.warnings, ...(run.assetWarnings ?? []).map((issue): Issue => ({ code: 'W_CONTENT_SANITIZED', severity: 'warning', path: `${paths.get(issue.elementId) ?? ''}/asset`, elementId: issue.elementId, message: `${issue.code}: ${issue.message}` }))];
+        const outcome: Record<string, unknown> = { ok: true, warnings: baseWarnings, timingsMs: tracker.timings };
         if (requested.json) { outcome['json'] = toDiagramJson(resolved.authored ?? [], run.layout, run.flowIds); }
-        if (requested.svg) {
-          const serialized = await page.evaluate(serializeSvgScene, options.svgOptions ?? {});
-          const qualify = (issues: SvgIssue[]): Issue[] => issues.map((issue) => ({ ...issue, path: issue.elementId ? paths.get(issue.elementId) ?? '' : issue.path })); const warnings = [...resolved.warnings, ...qualify(serialized.warnings)];
-          if (!serialized.ok) { return { ok: false as const, errors: qualify(serialized.errors), warnings }; } outcome['svg'] = serialized.svg; outcome['warnings'] = warnings; tracker.mark('svg');
-        }
+        if (requested.svg) { const serialized = await page.evaluate(serializeSvgScene, options.svgOptions ?? {}); const qualify = (issues: SvgIssue[]): Issue[] => issues.map((issue) => ({ ...issue, path: issue.elementId ? paths.get(issue.elementId) ?? '' : issue.path })); const warnings = [...baseWarnings, ...qualify(serialized.warnings)]; if (!serialized.ok) { return { ok: false as const, errors: qualify(serialized.errors), warnings }; } outcome['svg'] = serialized.svg; outcome['warnings'] = warnings; tracker.mark('svg'); }
         if (requested.html) { embeddedFontCss ??= staged ? buildEmbeddedFontCss(staged) : ''; const serialized = await page.evaluate(() => window.__eraser.serialize()); outcome['html'] = buildHtmlDocument({ title: 'Eraser diagram', styles: [embeddedFontCss, serialized.css], body: serialized.scene }); tracker.mark('serialize'); }
         if (requested.png) { outcome['png'] = await page.locator('#eraser-scene').screenshot({ type: 'png', omitBackground: options.transparentBackground ?? false }); tracker.mark('screenshot'); }
         return outcome;

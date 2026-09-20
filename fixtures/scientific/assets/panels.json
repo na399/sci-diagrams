@@ -1,0 +1,12 @@
+{
+  "title":"Native schematic and imported vector plot",
+  "entities":[
+    {"tag":"SciPanel","id":"figure","label":"Scientific figure (synthetic)","x":20,"y":20,"width":880,"height":120,"fontSize":22,"layout":{"type":"row","gap":32,"padding":20,"header":48}},
+    {"tag":"SciPanel","id":"methods","containerId":"figure","label":"A. Method","width":400,"height":340,"fontSize":20,"layout":{"type":"column","gap":40,"padding":24,"header":40}},
+    {"tag":"SciBlock","id":"input","containerId":"methods","label":"Clinical features","width":330,"height":80,"fontSize":20},
+    {"tag":"SciBlock","id":"model","containerId":"methods","label":"Prediction model","width":330,"height":80,"fontSize":20},
+    {"tag":"SciPanel","id":"results","containerId":"figure","label":"B. Training curve","width":420,"height":340,"fontSize":20,"layout":{"type":"column","padding":10,"header":44}},
+    {"tag":"SciSvgAsset","id":"plot","containerId":"results","asset":"training","width":400,"height":260}
+  ],
+  "connections":[{"tag":"SciLink","id":"features","from":"input","to":"model","fromPort":"bottom","toPort":"top"}]
+}

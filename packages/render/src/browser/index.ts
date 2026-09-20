@@ -11,11 +11,12 @@ import { constrainConnectionLabels, deferConstrainedConnectionLabels, resolveTex
 import { composeMeasuredScene } from './composition.js';
 import { lintSvgPublication } from '../publication.js';
 import { sanitizeSvgDocument } from '../svgSafety.js';
+import { mountSvgAssets, type SvgAssetWarning } from '../svgAssets.js';
 export type { WireFontFace, UrlFontFace, RegisterFontsRequest } from './fonts.js';
 export type { ElementMeasure, MeasuredBox } from './measure.js';
 export interface PageSetup { templates: Record<string, { html: string; css: string }>; baseCss: string; washMaster?: string }
-export interface RunRequest { entities: ResolvedEntity[]; connections: ResolvedConnection[]; icons: Record<string, string> }
-export interface RunResult { measures: ElementMeasure[]; layout: SceneLayout; flowIds?: string[] }
+export interface RunRequest { entities: ResolvedEntity[]; connections: ResolvedConnection[]; icons: Record<string, string>; svgAssets?: Record<string, string> }
+export interface RunResult { measures: ElementMeasure[]; layout: SceneLayout; flowIds?: string[]; assetWarnings?: SvgAssetWarning[] }
 export interface SerializedScene { scene: string; css: string }
 let templatesHtml: Record<string, string> | undefined; let washMaster: string | undefined;
 function setup(config: PageSetup): void {
@@ -29,6 +30,7 @@ async function run(request: RunRequest): Promise<RunResult> {
   const { entities, connections } = request; const all: ResolvedElement[] = [...entities, ...connections];
   const washDefs = await prepareWashMasters(washMaster, all); const fill = createFillEngine({ templates: templatesHtml, icons: request.icons });
   const { scene, mounted } = mountScene(all, fill); if (washDefs !== '') { scene.insertAdjacentHTML('afterbegin', washDefs); }
+  const assetWarnings = mountSvgAssets(mounted, request.svgAssets);
   await document.fonts.ready; const intrinsics = measureIntrinsics(mounted); const resolvedSizes = resolveTextSizedElements(entities, mounted, intrinsics);
   const composed = composeMeasuredScene(entities, mounted, resolvedSizes); const activeEntities = composed.entities;
   let measures = measureScene(mounted, intrinsics); let finalExternalText = externalTextOf(measures);
@@ -36,7 +38,7 @@ async function run(request: RunRequest): Promise<RunResult> {
   if (provisional.deferred) { constrainConnectionLabels(connections, mounted, layout); measures = measureScene(mounted, intrinsics); finalExternalText = externalTextOf(measures); layout = routeScene(activeEntities, connections, resolvedSizes, finalExternalText); }
   for (let pass = 0; pass < 2; pass += 1) { if (!constrainConnectionLabels(connections, mounted, layout)) { break; } measures = measureScene(mounted, intrinsics); finalExternalText = externalTextOf(measures); layout = routeScene(activeEntities, connections, resolvedSizes, finalExternalText); }
   applyLayout(scene, mounted, layout, containmentZIndex(all), measures); attachContainerContent(all, measures, layout);
-  return { measures, layout, ...(composed.flowIds.length ? { flowIds: composed.flowIds } : {}) };
+  return { measures, layout, ...(composed.flowIds.length ? { flowIds: composed.flowIds } : {}), ...(assetWarnings.length ? { assetWarnings } : {}) };
 }
 function containmentZIndex(elements: ResolvedElement[]): Map<string, number> {
   const byId = new Map(elements.map((element) => [element.id, element])); const nestedIds = new Set(elements.map((element) => element.containerId).filter((id): id is string => typeof id === 'string'));
