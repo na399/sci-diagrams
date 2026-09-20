@@ -74,13 +74,17 @@ describe('loadFileConfig', () => {
     expect(() => loadFileConfig(writeConfig(root, { pages: '2' }))).toThrow(
       /"pages" must be a positive number/,
     );
-    expect(() => loadFileConfig(writeConfig(root, { format: 'svg' }))).toThrow(/png \| html/);
+    expect(() => loadFileConfig(writeConfig(root, { format: 'jpeg' }))).toThrow(/png \| html/);
     expect(() => loadFileConfig(writeConfig(root, { icons: { onUnknown: 'warn' } }))).toThrow(
       /"icons.onUnknown"/,
     );
     expect(() => loadFileConfig(writeConfig(root, { icons: { url: 'x' } }))).toThrow(/"icons.url"/);
     expect(() => loadFileConfig(writeConfig(root, []))).toThrow(/JSON object/);
     expect(() => loadFileConfig(writeConfig(root, { fonts: { roles: {} } }))).toThrow(/"fonts"/);
+  });
+
+  it.each(['svg', 'pdf'])('accepts %s as an explicit format', (format) => {
+    expect(loadFileConfig(writeConfig(tree(), { format }))).toEqual({ format });
   });
 
   it('reports unreadable and malformed files as CliError', () => {

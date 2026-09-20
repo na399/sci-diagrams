@@ -93,3 +93,8 @@ export {
   type IconLoader,
   type ElementNormalizer,
 } from '@eraserlabs/resolve';
+
+// Scientific export helpers keep clients above the existing package boundary.
+export { parsePhysicalLength, toMillimeters } from '@eraserlabs/render';
+export type { PhysicalLength, SvgExportOptions, PublicationOptions, PublicationReport } from '@eraserlabs/render';
+export { loadSvgAssetFiles } from './assetFiles.js';

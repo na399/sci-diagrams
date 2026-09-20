@@ -7,7 +7,7 @@ export const CONFIG_FILE_NAME = 'eraser-diagrams.config.json';
 export const CONFIG_ENV = 'ERASER_DIAGRAMS_CONFIG';
 export const CHROMIUM_ENV = 'CHROMIUM_PATH';
 
-export const OUTPUT_FORMATS = ['png', 'html'] as const;
+export const OUTPUT_FORMATS = ['png', 'html', 'svg', 'pdf'] as const;
 export type OutputFormat = (typeof OUTPUT_FORMATS)[number];
 
 export const UNKNOWN_ICON_POLICIES = ['placeholder', 'error'] as const;
