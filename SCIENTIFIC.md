@@ -1,45 +1,57 @@
 # Scientific figures in sci-diagrams
 
-`sci-diagrams` is an Eraser Diagrams fork, not a new figure protocol. The scientific extension keeps MDP documents, the resolver, browser measurement, routing, and existing stock rendering. It adds an opt-in scientific component library and strict SVG output from the same applied scene.
+This is an Eraser Diagrams fork. MDP, the stock profile, resolver, Chromium measurement and routing remain the foundation. Scientific figures use an opt-in component library, measured composition and strict editable SVG. No separate figure protocol, desktop editor or agent runtime is introduced.
 
-**Status: experimental foundation.** The repository-wide build and real renderer integration tests must pass before this branch is considered release-ready. See [validation status](docs/architecture/scientific-extension.md#validation-status).
+**Status: implementation stack available; release qualification pending.** See [the PR stack](docs/STACK.md) and [qualification gates](docs/QUALIFICATION.md). Committed integration tests are not evidence that they have passed.
 
-## Run an example
+## Run a figure
 
-Use the fork checkout, Node 22.12 or newer, pnpm as pinned by `package.json`, and a local Chrome/Chromium installation. There are no new runtime dependencies.
+Use Node 22.12 or newer, the pnpm version in `package.json`, and Chrome/Chromium.
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm build
 
 node tools/scientific/render.mjs fixtures/scientific/cohort-timeline.json \
-  --width-mm 178 --format svg,png,json \
+  --width 178mm --format svg,pdf,png,json \
   --out-dir out/scientific
 ```
 
-Browser discovery checks `CHROMIUM_PATH` and common macOS/Linux installation paths. To specify Chrome on macOS:
+The multi-format helper performs one figure render and writes the requested `.svg`, `.pdf`, `.png`, `.html` and `.measured.json` artifacts. `--width-mm 178` remains supported. Set `--chromium-path` or `CHROMIUM_PATH` when automatic macOS/Linux browser discovery is insufficient.
+
+The **native CLI now also supports SVG and PDF**:
 
 ```sh
-node tools/scientific/render.mjs fixtures/scientific/dense-model.json \
-  --chromium-path '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' \
-  --width-mm 178 --format svg,png,html,json
+node packages/diagrams-cli/dist/cli.js render \
+  fixtures/scientific/cohort-timeline.json \
+  --profile scientific --format svg --width 178mm -o out/timeline.svg
 ```
 
-The helper writes `name.svg`, `name.png`, `name.html`, and `name.measured.json` as requested. Each file is written through a temporary file and rename. A render or strict-SVG failure writes no requested artifacts. An I/O failure during multi-file output may leave earlier completed files; this is not a transactional export directory. Source JSON is not overwritten.
+Use `--profile scientific-web` for the alternative web theme. The stock profile remains the default. These profile/width/assets/lint switches are render flags; browserless `validate`, `registry` and `schema` retain the existing custom-library configuration mechanism. `--print-config` reports that existing configuration, not the additive render-only switches.
 
-`--transparent` preserves a transparent PNG canvas and SVG background; it does not remove component fills. `--fail-on-warning` prevents writes when any warning occurs. Warnings and errors are JSON on stderr. Exit codes are 0 for success, 1 for a rejected figure, and 2 for invocation, browser, or I/O failures.
+`--lint` runs publication checks before writing. Add `--fail-on-warning` to reject warnings as well as errors. The multi-format helper uses the source document's `title` for SVG accessibility; the API accepts explicit title/description options. A missing title can itself produce a publication warning.
 
-This helper is additive. The existing `eraser-diagrams` CLI has not yet gained an `--format svg` flag. Use the helper or API for SVG. Existing custom-library configuration remains available for the upstream CLI's supported outputs.
+Writes are atomic per file, not transactional across an output directory. Source overwrite and colliding native-CLI batch destinations are rejected. Invocation/I/O failures return exit 2, rejected figures return 1, and successful exports return 0. No raster fallback is performed.
+
+## Compose an imported plot
+
+```sh
+node tools/scientific/render.mjs fixtures/scientific/assets/panels.json \
+  --assets fixtures/scientific/assets/registry.json \
+  --width 178mm --format svg,pdf,png \
+  --out-dir out/panels
+```
+
+An explicit registry maps asset IDs to relative local paths, for example `{ "plot": "plot.svg" }`. Paths are resolved relative to the registry directory, cannot escape it through symlinks, and are bounded by file/count/total-size limits. API callers can instead supply a bounded `svgAssets` map of SVG strings. Source documents reference those IDs through `SciSvgAsset`; they cannot choose arbitrary filesystem paths or network URLs.
+
+SVG intake is validated while inert before assets enter the scene. Scripts, event handlers, raster images, external resources, resource cycles, excessive expansion, unsupported effects and `foreignObject` fail closed. Supported static CSS is inlined and IDs are isolated per imported instance. An exact external-only standard SVG 1.1 doctype can be removed without fetching it; internal entity declarations remain forbidden. See [SVG assets](docs/architecture/svg-assets.md).
 
 ## API
 
 ```ts
 import { writeFile } from 'node:fs/promises';
 import { createRenderer } from '@eraserlabs/diagrams';
-import {
-  scientificLibrary,
-  scientificNormalizers,
-} from '@eraserlabs/diagrams/scientific';
+import { scientificLibrary, scientificNormalizers } from '@eraserlabs/diagrams/scientific';
 
 const renderer = await createRenderer({
   chromiumPath: '/usr/bin/chromium',
@@ -48,126 +60,76 @@ const renderer = await createRenderer({
   svgOptions: {
     widthMm: 178,
     title: 'Study design',
-    description: 'Predictor ascertainment and follow-up relative to index.',
+    description: 'Synthetic cohort illustration.',
     background: 'white',
     minFontPt: 7,
     minStrokePt: 0.5,
   },
 });
-
 try {
   const result = await renderer.render({
-    entities: [
-      {
-        tag: 'SciBlock', id: 'cohort', x: 20, y: 20,
-        width: 220, height: 90, label: 'Eligible cohort\nSynthetic example',
-      },
-    ],
+    entities: [{
+      tag: 'SciBlock', id: 'cohort', x: 20, y: 20,
+      width: 220, height: 90, label: 'Eligible cohort\nSynthetic example',
+    }],
     connections: [],
-    outputs: { svg: true, png: true, json: true },
+    outputs: { svg: true, pdf: true, png: true, json: true },
   });
-  if (!result.ok) {
-    throw new Error(JSON.stringify(result.errors));
-  }
+  if (!result.ok) { throw new Error(JSON.stringify(result.errors)); }
+  const report = await renderer.lintSvg(result.svg);
+  if (!report.ok) { throw new Error(JSON.stringify(report.issues)); }
   await writeFile('study.svg', result.svg);
+  await writeFile('study.pdf', result.pdf);
 } finally {
   await renderer.close();
 }
 ```
 
-The `@eraserlabs/*` workspace names are retained to minimize upstream divergence. This fork must **not** be published to npm under the upstream namespace. A fork-owned namespace is a release prerequisite.
+`outputs.pdf` derives from the same strict SVG export used by `outputs.svg`. It does not introduce a second diagram layout. PDF printing uses a dedicated page, leaves pooled scenes untouched and blocks network requests during printing. PDF-only requests do not implicitly return an SVG field. Expected print-validation failures carry `stageCode: E_PDF`; unexpected runtime errors are not disguised as invalid figure input.
 
-Use `createScientificLibrary('web')` for the alternative subdued web palette. A library and its normalizers must be supplied together. The stock library remains the default; the scientific profile does not silently replace it or merge its vocabulary.
+The renderer supports 1–16 warm pages. Close is idempotent and rejects queued work. See [vector PDF](docs/architecture/vector-pdf.md) for font and physical-size limitations.
 
-## Components
+## Scientific vocabulary
 
-| Tag | Current capability |
+| Family | Components/capabilities |
 | --- | --- |
-| `SciBlock` | Module, process, cohort, or other labeled rectangle |
-| `SciGroup` | Fixed-size MDP container with a title |
-| `SciText` | Plain annotation text, with explicit newline breaks |
-| `SciOperator` | Labeled ellipse, including Unicode mathematical operators |
-| `SciTensor` | Schematic tensor with optional dimension labels |
-| `SciMatrix` | Abstract 4-by-4 matrix glyph, not a data heatmap |
-| `SciDimension` | Horizontal dimension line and label |
-| `SciBrace` | Horizontal brace and label |
-| `SciTimeline` | Proportional numeric timelines, lanes, points, intervals |
-| `SciLink` | Existing Eraser routing with vector arrowheads and SVG labels |
+| Structure | `SciBlock`, `SciGroup`, `SciPanel`, `SciRegion`, `SciText` |
+| Relationships | `SciLink`, `SciLeader`, explicit side/named ports, arrow and dash semantics |
+| Annotations | `SciDimension`, `SciBrace`, `SciBracket`, `SciDivider`, `SciCallout` |
+| Model/data glyphs | `SciOperator`, `SciTensor`, configurable abstract `SciMatrix`, `SciSequence`, `SciRepeat` |
+| Temporal figures | `SciTimeline`, numeric scales, lanes/subrows, interval closure, index and censoring marks |
+| Composition with results | `SciSvgAsset`, sanitized plot vectors in native panels |
 
-Entities require `id`, `x`, and `y`. Geometry remains in Eraser's pixel coordinate system. Set `width` and `height` explicitly for dense figures. Plain labels accept `\n`; automatic wrapping, Markdown, TeX, and automatic label collision avoidance are not included.
+Inspect `renderer.registryInfo()` and `renderer.tagSchema(tag)` for the implemented schema rather than assuming an arbitrary property is supported. Components are generic visual structures, not an AI-model or clinical ontology. Matrices and repeated blocks are schematic glyphs, not plotting/statistical computation.
 
-`SciGroup` uses normal flat MDP `containerId` references. Child coordinates are scene coordinates, not parent-relative coordinates. It is not an implicit row/grid layout or a dynamically sized panel. Ensure its authored bounds enclose its members.
+### Placement and ports
 
-`SciLink` supports `fromPort`/`toPort` values `top`, `right`, `bottom`, and `left`, existing `straight`/`elbow` route choices, and explicit `points`. Arbitrary named ports have not been added. `labelWidth` sets a connection label's viewport when the conservative default is inadequate. Long labels should use explicit newlines and sufficient space.
+The authored document remains flat MDP entities/connections, with `containerId` for containment. Coordinates remain Eraser scene pixels; physical output sizing is an export transform.
 
-## Quantitative timelines
+Measured row, column, grid, stack and overlay composition size children inside-out and place them outside-in. Explicit pins remain pins. Measured JSON retains `layoutItem: "flow"` for automatically placed entities so re-rendering does not accidentally pin every child. Group/panel frame growth does not scale text or tensor glyphs. The older explicit `arrange()` helper remains available for known-size layouts.
 
-```json
-{
-  "entities": [{
-    "tag": "SciTimeline", "id": "study-time", "x": 20, "y": 20,
-    "width": 1000, "start": -365, "end": 90, "origin": 0,
-    "ticks": [-365, -180, -60, 0, 30, 90],
-    "lanes": [{"id": "predictors", "label": "Predictors"}],
-    "items": [{
-      "id": "baseline", "lane": "predictors", "kind": "interval",
-      "start": -365, "end": -60, "closed": "left",
-      "label": "Feature ascertainment"
-    }]
-  }],
-  "connections": []
-}
-```
+Named normalized perimeter ports are translated into Eraser's existing relative-port/face contracts. Unknown or malformed ports fail with source-qualified diagnostics. Named ports currently require rectangular routable bodies; curved outlines retain ordinary side-port behavior. Exact manually authored paths remain available.
 
-Positions are proportional to the numeric domain. Out-of-domain values are rejected rather than clamped. Numeric units must be identified in the figure text; this is not a calendar/date/time-zone engine.
+### Timelines
 
-`kind: "event"` requires a `start` and forbids `end`. An interval requires `end > start`. Endpoint closure is explicit: `left` means `[start, end)`, `right` means `(start, end]`, `both` includes both, and `neither` excludes both. The default is `left`. Solid circles denote included endpoints and white-filled circles excluded endpoints. The latter currently assume a white plotting background.
+Positions are proportional to explicit numeric offsets. The library does not convert calendar dates, months or time zones. Specify the intended `unit` and `originLabel`. Explicit subrows separate visual items without moving their time coordinates.
 
-Lanes and items need unique IDs. A lane reference must exist. The initial limits are 32 lanes, 512 items, and 64 ticks. Overlapping items and labels in one lane are not automatically separated. Use separate lanes and human review. The renderer does not validate clinical study design, clinical validity of a risk window, or cohort-count arithmetic.
+Interval closure is explicit: `left` means `[start,end)`, `right` means `(start,end]`, `both` includes both endpoints and `neither` excludes both. Intervals require `end > start`. Out-of-domain positions are rejected, not silently clamped. Events, intervals, lanes and censoring marks require valid references/IDs. White-filled excluded-endpoint markers currently assume a white timeline background.
 
-## Explicit arrangement helpers
+Clinical intent, study-design validity and general cohort-count arithmetic remain the author's responsibility. The acceptance corpus has explicit synthetic count-conservation assertions; that is not a generic clinical validator.
 
-```ts
-import { arrange } from '@eraserlabs/diagrams/scientific';
+## Publication and reproducibility
 
-const entities = arrange([
-  { tag: 'SciBlock', id: 'a', width: 200, height: 80, label: 'Input' },
-  { tag: 'SciBlock', id: 'b', width: 200, height: 80, label: 'Model' },
-], { type: 'row', x: 20, y: 20, gap: 40, align: 'center' });
-```
+Strict SVG retains editable text, routed paths and source identities. Unsupported HTML/CSS is rejected, not converted to screenshots. The publication linter measures final physical font/stroke sizes, bounds and configured overlap/font rules. Thresholds such as 7 pt text and 0.5 pt strokes are configurable project settings, not universal journal requirements.
 
-`row`, `column`, and `grid` operate on known sizes, clone their inputs, and emit ordinary MDP coordinates. They refuse to overwrite authored `x` or `y`. There is no new document envelope, implicit composition stage, constraint solver, or change to MDP coordinate semantics.
+SVG font families are editable references, not automatically embedded fonts or outlined text. PDF font embedding is handled by Chromium and must be inspected for the selected fonts. Pin the browser, OS/font environment, source, assets and theme when qualifying a figure. Identical PDF bytes are not promised because the print backend writes metadata. Manually edited SVG does not become new MDP source.
 
-## Strict SVG contract
+Use `<img src="figure.svg">` to isolate multiple SVGs on a blog page unless resource IDs are additionally namespaced across documents. `--transparent` changes the canvas background, not explicit component fills.
 
-SVG is extracted from the applied browser scene, after Eraser has measured and routed it. It is not a screenshot and does not run an independent layout. Vector-safe templates paint with SVG while unpainted HTML wrappers may position SVG islands.
+Not included: arbitrary HTML-to-SVG conversion, automatic general text wrapping, a global constraint solver, TeX, statistical plotting, a GUI editor, `.solfig`, PPTX, or journal certification. Illustrator/Inkscape interoperability and cross-platform font identity still require qualification.
 
-The exporter preserves text as `<text>`, routes as paths, and source identity in `data-mdp-id`/`data-mdp-tag` groups. It resolves supported presentation styles and namespaces SVG resource IDs within one output document. It rejects unsupported HTML paint, `foreignObject`, raster images, scripts/event handlers, external or unresolved resource references, unsupported effects, and detected text viewport overflow. There is no silent raster fallback.
+## Distribution
 
-This is a restricted export contract, not arbitrary HTML/CSS-to-SVG conversion or an untrusted-SVG import sanitizer. Template libraries and normalizers remain trusted installed code, governed by Eraser's existing validation rules. Imported SVG assets are not supported yet. Manual SVG edits do not round-trip back into MDP; source JSON remains authoritative.
+The `@eraserlabs/*` workspace names remain for development continuity. The fork must not publish packages under the upstream namespace. The inherited publish workflow is guarded in the foundation PR as well as the final cumulative branch. Choosing a fork-owned namespace and publishing a release require a separate explicit decision.
 
-Physical output width does not alter the underlying geometry. Font and stroke checks use the **final physical scale**, so shrinking a dense figure can produce warnings. Default 7-point text and 0.5-point strokes are configurable project thresholds, not universal journal requirements. Warnings do not establish publication compliance. No complete contrast, overlap, accessibility, or scientific-correctness audit is implied.
-
-Fonts remain editable references and are not embedded or outlined. The initial profile uses generic font families. Pin the browser and installed fonts for reproducible builds, and check the result in the intended editor/submission tool. Cross-platform byte identity and Illustrator/Inkscape interoperability have not been certified. For multiple inline SVG figures on one web page, isolate them with `<img>` until document-level resource-ID prefixes are added.
-
-## Examples and tests
-
-The three source fixtures are synthetic and contain no patient data:
-
-- `fixtures/scientific/dense-model.json`: model boundary, multiple modalities, operators, a residual path, tensor/matrix glyphs, and annotations.
-- `fixtures/scientific/cohort-timeline.json`: proportional ascertainment, exclusion gap, index, outcome, and follow-up windows.
-- `fixtures/scientific/cohort-design.json`: branching, exclusions, comparison groups, and synthetic counts.
-
-After dependency installation and build:
-
-```sh
-pnpm typecheck
-pnpm depcruise
-pnpm lint
-pnpm test
-pnpm --filter @eraserlabs/diagrams exec playwright install chromium --with-deps
-pnpm --filter @eraserlabs/diagrams exec playwright test test/scientific-svg.spec.ts
-pnpm test:e2e
-```
-
-The dedicated integration tests attach generated SVG/PNG previews to the Playwright report. Those reports, not hand-edited pictures, are the acceptance evidence. Fixtures are acceptance **inputs**, not a claim that the full integration gate has already passed.
+All example figures are synthetic. The [qualification checklist](docs/QUALIFICATION.md), not the existence of source fixtures or draft PRs, determines readiness.
