@@ -1,0 +1,25 @@
+{
+  "entities": [
+    {"tag":"SciText","id":"title","x":20,"y":0,"width":1000,"height":50,"label":"Cohort construction (synthetic counts)","fontSize":22},
+    {"tag":"SciBlock","id":"source","x":410,"y":70,"width":240,"height":72,"label":"Source population\nn = 10,000"},
+    {"tag":"SciBlock","id":"eligible","x":410,"y":210,"width":240,"height":72,"label":"Eligible population\nn = 8,000"},
+    {"tag":"SciBlock","id":"excluded","x":740,"y":210,"width":220,"height":72,"label":"Excluded\nn = 2,000"},
+    {"tag":"SciBlock","id":"arm-a","x":150,"y":365,"width":240,"height":72,"label":"Exposure arm\nn = 3,000"},
+    {"tag":"SciBlock","id":"arm-b","x":650,"y":365,"width":240,"height":72,"label":"Comparator arm\nn = 5,000"},
+    {"tag":"SciBlock","id":"retained-a","x":150,"y":535,"width":240,"height":72,"label":"Analyzed\nn = 2,400"},
+    {"tag":"SciBlock","id":"retained-b","x":650,"y":535,"width":240,"height":72,"label":"Analyzed\nn = 4,000"},
+    {"tag":"SciText","id":"exclude-a","x":155,"y":455,"width":250,"height":50,"label":"Excluded after indexing: 600","fontSize":14},
+    {"tag":"SciText","id":"exclude-b","x":655,"y":455,"width":260,"height":50,"label":"Excluded after indexing: 1,000","fontSize":14},
+    {"tag":"SciBlock","id":"analysis","x":410,"y":710,"width":240,"height":72,"label":"Analysis set\nn = 6,400"}
+  ],
+  "connections": [
+    {"id":"source-eligible","tag":"SciLink","from":"source","to":"eligible","fromPort":"bottom","toPort":"top"},
+    {"id":"source-excluded","tag":"SciLink","from":"source","to":"excluded","fromPort":"right","toPort":"top"},
+    {"id":"eligible-a","tag":"SciLink","from":"eligible","to":"arm-a","fromPort":"left","toPort":"top"},
+    {"id":"eligible-b","tag":"SciLink","from":"eligible","to":"arm-b","fromPort":"right","toPort":"top"},
+    {"id":"a-retained","tag":"SciLink","from":"arm-a","to":"retained-a","fromPort":"left","toPort":"left"},
+    {"id":"b-retained","tag":"SciLink","from":"arm-b","to":"retained-b","fromPort":"right","toPort":"right"},
+    {"id":"a-analysis","tag":"SciLink","from":"retained-a","to":"analysis","fromPort":"bottom","toPort":"left"},
+    {"id":"b-analysis","tag":"SciLink","from":"retained-b","to":"analysis","fromPort":"bottom","toPort":"right"}
+  ]
+}
