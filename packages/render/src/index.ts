@@ -4,3 +4,5 @@ export * from './svg.js';
 export * from './physical.js';
 export * from './ports.js';
 export * from './composition.js';
+export * from './svgSafety.js';
+export * from './publication.js';
