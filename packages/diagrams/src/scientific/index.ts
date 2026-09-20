@@ -102,7 +102,7 @@ timelineProps.intervalMarks = timelineProps.marks!;
 timelineProps.eventMarks = timelineProps.marks!;
 const timelineMarkup = `
 <line x1="{{axisLeft}}" x2="{{axisRight}}" y1="{{axisY}}" y2="{{axisY}}" stroke="{{stroke}}" stroke-width="{{strokeWidth}}"></line>
-<line data-if="hasOrigin" x1="{{originX}}" x2="{{originX}}" y1="16" y2="{{axisBottom}}" stroke="{{stroke}}" stroke-width="{{strokeWidth}}" stroke-dasharray="4 4"></line>
+<line data-if="hasOrigin" x1="{{originX}}" x2="{{originX}}" y1="{{axisY}}" y2="{{axisBottom}}" stroke="{{stroke}}" stroke-width="{{strokeWidth}}" stroke-dasharray="4 4"></line>
 <g data-each="tick of tickMarks" data-key="key">
   <line x1="{{tick.x}}" x2="{{tick.x}}" y1="{{tick.y}}" y2="{{tick.bottom}}" stroke="{{stroke}}" stroke-width="{{strokeWidth}}"></line>
   <text x="{{tick.x}}" y="{{tick.textY}}" text-anchor="middle" font-family="{{fontFamily}}" font-size="{{fontSize}}" fill="{{textColor}}">{{tick.text}}</text>
@@ -133,6 +133,7 @@ const linkSchema = connectionSchema('SciLink', {
   textColor: { ...CssColor, default: '#17202a' },
   strokeWidth: { type: 'number', minimum: 0.1, default: 1.5 },
   lineWidthPx: number,
+  markerId: key,
   fromPort: { type: 'string', enum: ['top', 'right', 'bottom', 'left'] },
   toPort: { type: 'string', enum: ['top', 'right', 'bottom', 'left'] },
   connectorStyle: { type: 'string', enum: ['elbow', 'straight'], default: 'elbow' },
@@ -145,8 +146,8 @@ const linkSchema = connectionSchema('SciLink', {
 const linkTemplate: TemplateFile = {
   name: 'SciLink',
   html: `<template name="SciLink"><div data-tpl="SciLink">
-  <svg class="sci-line"><defs><marker id="sci-arrow" viewBox="0 0 8 8" markerWidth="6" markerHeight="6" refX="8" refY="4" orient="auto"><path d="M 0 0 L 8 4 L 0 8 Z" fill="{{stroke}}"></path></marker></defs>
-  <path data-role="anchor" d="{{ }}" fill="none" stroke="{{stroke}}" stroke-width="{{lineWidthPx}}" marker-end="url(#sci-arrow)"></path></svg>
+  <svg class="sci-line"><defs><marker id="{{markerId}}" viewBox="0 0 8 8" markerWidth="6" markerHeight="6" refX="8" refY="4" orient="auto"><path d="M 0 0 L 8 4 L 0 8 Z" fill="{{stroke}}"></path></marker></defs>
+  <path data-role="anchor" d="{{ }}" fill="none" stroke="{{stroke}}" stroke-width="{{lineWidthPx}}" marker-end="url(#{{markerId}})"></path></svg>
   <span class="sci-label" data-if="label" data-role="external-text" data-text-grow-policy="width-only">
   <svg width="{{labelWidth}}" height="{{labelHeight}}" viewBox="0 0 {{labelWidth}} {{labelHeight}}">
     <g data-each="line of lines" data-key="key"><text x="{{line.x}}" y="{{line.y}}" text-anchor="middle" fill="{{textColor}}" font-family="{{fontFamily}}" font-size="{{fontSize}}">{{line.text}}</text></g>
@@ -202,6 +203,9 @@ function normalize(element: Record<string, unknown>, tag: string): void {
   }
   if (tag === 'SciLink') {
     const width = value(element, 'labelWidth', Math.max(24, ...labelLines.map((s) => [...s].length * font * 0.75 + 16)));
+    // Document-unique IDs must also be unique in the mixed HTML/SVG preview, before export.
+    // Hex code points produce safe resource identifiers without I/O or lossy punctuation stripping.
+    element.markerId = `sci-arrow-${Array.from(String(element.id), (char) => char.codePointAt(0)!.toString(16)).join('-')}`;
     element.labelWidth = width;
     element.labelHeight = labelLines.length * font * 1.4 + 8;
     element.lineWidthPx = value(element, 'strokeWidth', 1.5);
