@@ -34,6 +34,8 @@ jobs:
       - run: pnpm test
       # Includes legacy browser regressions and all scientific stack integration suites.
       - run: pnpm test:e2e
+      - name: Export the three-domain acceptance corpus
+        run: node tools/scientific/acceptance.mjs
       - name: Scientific figures and browser reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -42,6 +44,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
           path: |
+            out/scientific-acceptance
             packages/diagrams/test-results
             packages/diagrams/playwright-report
             packages/render/test-results
