@@ -14,7 +14,7 @@ The original PR0–PR14 milestones are represented by nine dependent PRs. PR #1 
 | [#8](https://github.com/na399/sci-diagrams/pull/8) | `stack/08-assets` | #7 branch | PR13 sanitized SVG plot assets and native/imported panel composition |
 | [#9](https://github.com/na399/sci-diagrams/pull/9) | `stack/09-pdf-release` | #8 branch | PR14 vector PDF, native CLI, bounded asset-file loading, output safety, CI and release qualification |
 
-`stack/09-pdf-release` contains the cumulative implementation. Every PR remains draft pending the [qualification gates](QUALIFICATION.md). Feature code, source fixtures and committed test cases are not claims of a successful complete-workspace run.
+`stack/09-pdf-release` contains the cumulative implementation. All nine PRs are **implementation-complete and ready for review**. They remain unmerged pending the [qualification gates](QUALIFICATION.md). Feature code, source fixtures and committed test cases are not claims of a successful complete-workspace run.
 
 The inherited npm publishing guard is also backported to #1, so it protects the first merge rather than arriving only at the last milestone. No branches have been force-rewritten or merged. See the qualification document for bottom-up merge/retarget guidance, including that small parent-only backport.
 
